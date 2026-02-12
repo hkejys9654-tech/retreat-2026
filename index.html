@@ -11,6 +11,8 @@
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <!-- 화면 캡처 라이브러리 추가 -->
+    <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
 
     <style>
         body { 
@@ -47,12 +49,33 @@
             justify-content: center;
             transition: all 0.2s;
             cursor: pointer;
+            position: relative;
         }
         .seat-occupied {
             background-color: #fbbf24;
             color: #1e293b;
             border: 1px solid #d97706;
             box-shadow: inset 0 -2px 0 rgba(0,0,0,0.1);
+        }
+        .seat-delete-btn {
+            position: absolute;
+            top: -5px;
+            right: -5px;
+            width: 16px;
+            height: 16px;
+            background: #ef4444;
+            color: white;
+            border-radius: 50%;
+            font-size: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            transition: opacity 0.2s;
+            z-index: 30;
+        }
+        .seat:hover .seat-delete-btn {
+            opacity: 1;
         }
         .seat-highlight {
             background-color: #3b82f6 !important;
@@ -75,14 +98,55 @@
         
         @media (max-width: 640px) {
             .seat { height: 34px; font-size: 10px; }
+            .seat-delete-btn { width: 14px; height: 14px; font-size: 8px; }
         }
+
+        /* 인쇄 및 공유 시 시각화 최적화 */
+        @media print {
+            .no-print { display: none !important; }
+            body { background: white; padding: 0; margin: 0; }
+            .max-w-6xl { max-width: 100% !important; padding: 0 !important; margin: 0 !important; }
+            .bus-container { 
+                box-shadow: none !important; 
+                border: 2px solid #ccc !important; 
+                page-break-inside: avoid;
+                margin-bottom: 20px;
+            }
+            .seat-delete-btn { display: none !important; }
+            section { page-break-before: auto; }
+            .grid { display: grid !important; }
+        }
+
+        /* 공유 중 로딩 오버레이 */
+        .loading-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.7);
+            z-index: 500;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            backdrop-blur: 5px;
+        }
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid rgba(255,255,255,0.3);
+            border-top: 4px solid #3b82f6;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 1rem;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
     </style>
 </head>
 <body class="text-slate-900">
     <div id="root"></div>
 
     <script type="text/babel">
-        const { useState, useMemo, useEffect } = React;
+        const { useState, useMemo, useEffect, useRef } = React;
 
         const TIME_OPTIONS = [
             '2/23(월) 오전', '2/23(월) 오후', '2/23(월) 저녁',
@@ -90,12 +154,8 @@
             '2/25(수) 오전'
         ];
 
-        // --- 초기 데이터 전수 복구 ---
         const generateInitialData = () => {
             const data = [];
-            const now = Date.now();
-
-            // 버스 1호차 (40명)
             const b1 = ["윤해권", "배현기", "송기호", "서영진", "공현애", "노민숙", "박순", "김윤희", "최정숙", "김진희", "박영자", "이명숙", "김숙희", "이혜령", "이은자", "이순례", "김애숙", "정영란", "백종미", "이순희", "정동규", "이정희", "신효성", "박영미", "김다운", "박미순", "양란희", "안상아", "한은경", "조광순", "허경심", "노연미", "김연화", "문춘자", "윤미애", "김애란", "박복순", "김숙영", "이미경", "이강자"];
             b1.forEach((n, i) => {
                 const isRight = i >= 20;
@@ -103,15 +163,14 @@
                 data.push({ id: `b1-${i}`, name: n, vehicleType: '버스 1호차', departure: '2/23(월) 오전', return: '2/25(수) 오전', seatPosition: seat, groupId: 'bus1' });
             });
 
-            // 버스 2호차 (38명)
-            const b2 = ["양회순", "이양호", "이춘선", "김석옥", "문정옥", "황연숙", "최은희", "이미숙", "양희경", "강정인", "김소영", "자녀1", "김인숙", "황재향", "안윤미", "자녀1", "이효재", "이효주", "김이숙", "박유미", "임찬동", "김순종", "안재호", "김성표", "이미정", "강동희", "박영심", "박승희", "박정아", "정수진", "김순요", "김덕순", "자녀1", "자녀2", "장소희", "배소영", "이효준", "박미현"];
+            // 버스 2호차: 김석옥 -> 김성옥 수정
+            const b2 = ["양회순", "이양호", "이춘선", "김성옥", "문정옥", "황연숙", "최은희", "이미숙", "양희경", "강정인", "김소영", "자녀1", "김인숙", "황재향", "안윤미", "자녀1", "이효재", "이효주", "김이숙", "박유미", "임찬동", "김순종", "안재호", "김성표", "이미정", "강동희", "박영심", "박승희", "박정아", "정수진", "김순요", "김덕순", "자녀1", "자녀2", "장소희", "배소영", "이효준", "박미현"];
             b2.forEach((n, i) => {
                 const isRight = i >= 20;
                 const seat = (Math.floor((i % 20) / 2) * 4) + (isRight ? 2 : 0) + (i % 2);
                 data.push({ id: `b2-${i}`, name: n, vehicleType: '버스 2호차', departure: '2/23(월) 오전', return: '2/25(수) 오전', seatPosition: seat, groupId: 'bus2' });
             });
 
-            // 버스 3호차 (26명)
             const b3 = ["정해웅", "송희상", "정찬삼", "이상교", "정형우", "고영진", "서태웅", "이성헌", "정주영", "양현준", "이예은", "조은혜", "이효진", "김경만", "나병상", "송국한", "송정한", "김성오", "이준서", "정현진", "고영서", "양유진", "배다빈", "오태희", "강선미", "이서린"];
             b3.forEach((n, i) => {
                 const isRight = i >= 13;
@@ -119,7 +178,6 @@
                 data.push({ id: `b3-${i}`, name: n, vehicleType: '버스 3호차', departure: '2/23(월) 오전', return: '2/25(수) 오전', seatPosition: seat, groupId: 'bus3' });
             });
 
-            // --- 개인차량 명단 복구 (구체적 시간 반영) ---
             const privateGroups = [
                 { gid: 'p1', dr: '나수금', ps: ["이영욱", "이경애", "이혜령", "박유미"], dep: '2/23(월) 저녁', ret: '2/24(화) 저녁', note: '나수금S 차량 | 귀가시 이혜령, 박유미 동승' },
                 { gid: 'p2', dr: '고홍석', ps: ["이철귀"], dep: '2/23(월) 오후', ret: '2/24(화) 저녁', note: '고홍석B 차량' },
@@ -129,29 +187,20 @@
                 { gid: 'p6', dr: '김양현', ps: [], dep: '2/23(월) 오전', ret: '2/23(월) 저녁', note: '개인 출발 (회사)' },
                 { gid: 'p7', dr: '김웅범', ps: [], dep: '2/23(월) 오전', ret: '2/25(수) 오전', note: '개별 출발' }
             ];
-
             privateGroups.forEach(g => {
                 [g.dr, ...g.ps].forEach(name => {
-                    data.push({
-                        id: `p-${name}`, name, vehicleType: '개인차량', groupId: g.gid, 
-                        isDriver: name === g.dr, departure: g.dep, return: g.ret, details: g.note
-                    });
+                    data.push({ id: `p-${name}`, name, vehicleType: '개인차량', groupId: g.gid, isDriver: name === g.dr, departure: g.dep, return: g.ret, details: g.note });
                 });
             });
 
-            // --- 교회차량 명단 복구 (요청하신 구체적 출발시간 반영) ---
             const churchGroups = [
                 { gid: 'c1', type: '스타리아 A', dep: '2/23(월) 오전 07:00', ret: '2/23(월) 저녁', members: ["김석권", "김재중", "유현", "김대중", "김동만", "최재영", "문병용"] },
                 { gid: 'c2', type: '스타렉스 B', dep: '2/23(월) 저녁 19:40', ret: '2/24(화) 저녁', members: ["강지승", "손형환", "최영현", "황규연", "노우석", "서부석", "문성혁"] },
                 { gid: 'c3', type: '스타리아 C', dep: '2/24(화) 저녁 19:30', ret: '2/25(수) 오전', members: ["장세혁", "김상준", "김승완", "김용성", "차동철", "김용걸"] }
             ];
-
             churchGroups.forEach(g => {
                 g.members.forEach(name => {
-                    data.push({
-                        id: `c-${name}`, name, vehicleType: '교회차량', groupId: g.gid,
-                        isDriver: false, departure: g.dep, return: g.ret, details: `${g.type} 이용`
-                    });
+                    data.push({ id: `c-${name}`, name, vehicleType: '교회차량', groupId: g.gid, isDriver: false, departure: g.dep, return: g.ret, details: `${g.type} 이용` });
                 });
             });
 
@@ -159,7 +208,7 @@
         };
 
         const DeleteConfirm = ({ name, onConfirm, onCancel }) => (
-            <div className="fixed inset-0 z-[300] flex items-center justify-center p-6 bg-slate-900/60 backdrop-blur-sm" onClick={onCancel}>
+            <div className="fixed inset-0 z-[300] flex items-center justify-center p-6 bg-slate-900/60 backdrop-blur-sm no-print" onClick={onCancel}>
                 <div className="bg-white w-full max-w-xs rounded-3xl overflow-hidden shadow-2xl animate-pop" onClick={e => e.stopPropagation()}>
                     <div className="p-8 text-center">
                         <div className="w-16 h-16 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto mb-4 text-2xl">⚠️</div>
@@ -176,21 +225,24 @@
 
         const App = () => {
             const [data, setData] = useState([]);
-            const [isShareMode, setIsShareMode] = useState(false);
+            const [isAdmin, setIsAdmin] = useState(true);
             const [searchTerm, setSearchTerm] = useState('');
             const [selectedItem, setSelectedItem] = useState(null);
             const [confirmId, setConfirmId] = useState(null);
             const [draggedId, setDraggedId] = useState(null);
+            const [isSharing, setIsSharing] = useState(false);
+            
+            const captureRef = useRef(null);
 
             const [form, setForm] = useState({ name: '', vehicle: '버스 1호차', dep: '2/23(월) 오전', ret: '2/25(수) 오전', memo: '' });
 
             useEffect(() => {
-                const saved = localStorage.getItem('retreat_2026_full_v4');
+                const saved = localStorage.getItem('retreat_2026_full_v6');
                 setData(saved ? JSON.parse(saved) : generateInitialData());
             }, []);
 
             useEffect(() => {
-                if (data.length > 0) localStorage.setItem('retreat_2026_full_v4', JSON.stringify(data));
+                if (data.length > 0) localStorage.setItem('retreat_2026_full_v6', JSON.stringify(data));
             }, [data]);
 
             const stats = useMemo(() => ({
@@ -201,7 +253,6 @@
                 church: data.filter(p => p.vehicleType === '교회차량').length,
             }), [data]);
 
-            // 검색어에 따른 필터링된 데이터
             const searchResults = useMemo(() => {
                 if (!searchTerm.trim()) return [];
                 return data.filter(p => p.name.includes(searchTerm.trim()));
@@ -250,6 +301,46 @@
                 setDraggedId(null);
             };
 
+            // 고급 공유 기능: 이미지 캡처 후 Web Share API 사용
+            const handleShare = async () => {
+                if (!captureRef.current) return;
+                setIsSharing(true);
+                
+                try {
+                    // html2canvas 옵션: no-print 클래스를 가진 요소를 제외하고 캡처
+                    const canvas = await html2canvas(captureRef.current, {
+                        useCORS: true,
+                        scale: 2,
+                        backgroundColor: '#f8fafc',
+                        ignoreElements: (element) => element.classList.contains('no-print')
+                    });
+                    
+                    const dataUrl = canvas.toDataURL('image/png');
+                    const blob = await (await fetch(dataUrl)).blob();
+                    const file = new File([blob], '2026_수련회_차량배정.png', { type: 'image/png' });
+
+                    // Web Share API 지원 여부 확인
+                    if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+                        await navigator.share({
+                            files: [file],
+                            title: '2026 전도인 수련회 차량배정',
+                            text: '차량 배정 현황 공유드립니다.',
+                        });
+                    } else {
+                        // 미지원 시 다운로드 처리
+                        const link = document.createElement('a');
+                        link.href = dataUrl;
+                        link.download = '2026_수련회_차량배정.png';
+                        link.click();
+                    }
+                } catch (err) {
+                    console.error('공유 실패:', err);
+                    alert('이미지 생성 또는 공유 중 오류가 발생했습니다.');
+                } finally {
+                    setIsSharing(false);
+                }
+            };
+
             const renderBus = (type) => {
                 const members = data.filter(p => p.vehicleType === type);
                 const capacity = type === '버스 2호차' ? 47 : 45;
@@ -273,10 +364,15 @@
                                             onDragOver={e => e.preventDefault()} 
                                             onDrop={e => handleDrop(e, type, seatIdx)}
                                             className={`seat ${p ? 'seat-occupied' : 'seat-empty'} ${draggedId === p?.id ? 'opacity-20' : ''} ${isMatch ? 'seat-highlight' : ''}`}
-                                            draggable={!isShareMode && !!p}
+                                            draggable={isAdmin && !!p}
                                             onDragStart={e => { setDraggedId(p.id); e.dataTransfer.setData('sid', p.id); }}
                                             onClick={() => p && setSelectedItem(p)}
-                                        >{p?.name}</div>
+                                        >
+                                            {p?.name}
+                                            {isAdmin && p && (
+                                                <button onClick={(e) => { e.stopPropagation(); setConfirmId(p.id); }} className="seat-delete-btn no-print">✕</button>
+                                            )}
+                                        </div>
                                     );
                                 }))}
                             </div>
@@ -291,10 +387,15 @@
                                             onDragOver={e => e.preventDefault()} 
                                             onDrop={e => handleDrop(e, type, seatIdx)}
                                             className={`seat ${p ? 'seat-occupied' : 'seat-empty'} ${draggedId === p?.id ? 'opacity-20' : ''} ${isMatch ? 'seat-highlight' : ''}`}
-                                            draggable={!isShareMode && !!p}
+                                            draggable={isAdmin && !!p}
                                             onDragStart={e => { setDraggedId(p.id); e.dataTransfer.setData('sid', p.id); }}
                                             onClick={() => p && setSelectedItem(p)}
-                                        >{p?.name}</div>
+                                        >
+                                            {p?.name}
+                                            {isAdmin && p && (
+                                                <button onClick={(e) => { e.stopPropagation(); setConfirmId(p.id); }} className="seat-delete-btn no-print">✕</button>
+                                            )}
+                                        </div>
                                     );
                                 }))}
                             </div>
@@ -314,116 +415,137 @@
 
             return (
                 <div className="max-w-6xl mx-auto px-4 py-8 pb-32">
-                    <header className="flex justify-between items-center mb-10">
-                        <div>
-                            <h1 className="text-3xl font-black text-slate-900 tracking-tighter">2026 전도인 수련회 <span className="text-blue-600">차량운영</span></h1>
-                            <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Evangelist Retreat Dashboard</p>
+                    {/* 공유 로딩 오버레이 */}
+                    {isSharing && (
+                        <div className="loading-overlay">
+                            <div className="spinner"></div>
+                            <p className="font-black text-xl animate-pulse">이미지 생성 중...</p>
                         </div>
-                        <button onClick={() => setIsShareMode(!isShareMode)} className={`px-6 py-3 rounded-2xl font-black text-xs shadow-xl transition-all active:scale-95 ${isShareMode ? 'bg-red-500 text-white' : 'bg-slate-900 text-white'}`}>
-                            {isShareMode ? '🔓 관리 모드' : '🔒 공유 모드'}
-                        </button>
+                    )}
+
+                    <header className="flex flex-col sm:flex-row justify-between items-center mb-10 no-print gap-4">
+                        <div>
+                            <h1 className="text-3xl font-black text-slate-900 tracking-tighter text-center sm:text-left">2026 전도인 수련회 <span className="text-blue-600">차량운영</span></h1>
+                            <p className="text-xs font-bold text-slate-400 uppercase tracking-widest text-center sm:text-left">Evangelist Retreat Dashboard</p>
+                        </div>
+                        <div className="flex gap-2">
+                            <button onClick={() => setIsAdmin(!isAdmin)} className={`px-4 py-2 rounded-xl font-black text-[10px] shadow-sm transition-all ${isAdmin ? 'bg-slate-200 text-slate-600' : 'bg-slate-800 text-white'}`}>
+                                {isAdmin ? 'ADMIN MODE' : 'VIEW MODE'}
+                            </button>
+                            <button onClick={handleShare} className="px-6 py-3 rounded-2xl font-black text-xs shadow-xl bg-blue-600 text-white active:scale-95 transition-all">
+                                📤 공유
+                            </button>
+                        </div>
                     </header>
 
-                    {!isShareMode && (
-                        <section className="bg-white p-8 rounded-[40px] shadow-2xl border border-slate-100 mb-12 animate-pop">
-                            <h3 className="text-sm font-black text-slate-400 uppercase mb-6 flex items-center gap-2">
-                                <span className="w-2 h-2 bg-blue-500 rounded-full"></span> 신규 배정 등록
-                            </h3>
-                            <form onSubmit={handleAdd} className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <div className="space-y-4">
-                                    <input type="text" placeholder="성함" value={form.name} onChange={e => setForm({...form, name: e.target.value})} className="w-full h-14 px-6 bg-slate-50 border-2 border-slate-100 rounded-2xl font-bold outline-none focus:border-blue-500 transition-colors" />
-                                    <select value={form.vehicle} onChange={e => setForm({...form, vehicle: e.target.value})} className="w-full h-14 px-6 bg-slate-50 border-2 border-slate-100 rounded-2xl font-bold outline-none">
-                                        {['버스 1호차', '버스 2호차', '버스 3호차', '개인차량', '교회차량'].map(v => <option key={v}>{v}</option>)}
-                                    </select>
-                                </div>
-                                <div className="space-y-4">
-                                    <div className="flex gap-2">
-                                        <select value={form.dep} onChange={e => setForm({...form, dep: e.target.value})} className="flex-1 h-14 px-4 bg-slate-50 border-2 border-slate-100 rounded-2xl font-bold text-sm">
-                                            {TIME_OPTIONS.map(t => <option key={t}>{t}</option>)}
-                                        </select>
-                                        <select value={form.ret} onChange={e => setForm({...form, ret: e.target.value})} className="flex-1 h-14 px-4 bg-slate-50 border-2 border-slate-100 rounded-2xl font-bold text-sm">
-                                            {TIME_OPTIONS.map(t => <option key={t}>{t}</option>)}
+                    {/* 캡처 구역 시작 */}
+                    <div ref={captureRef} id="capture-area" className="bg-transparent p-2">
+                        {/* 캡처/인쇄용 제목 (평소엔 숨김) */}
+                        <div className="hidden print:block mb-8 text-center border-b-4 border-slate-900 pb-4">
+                            <h1 className="text-4xl font-black mb-1">2026 전도인 수련회 차량 배정 현황</h1>
+                            <p className="text-slate-500 font-bold">작성 일시: {new Date().toLocaleDateString()} {new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</p>
+                        </div>
+
+                        {isAdmin && (
+                            <section className="bg-white p-8 rounded-[40px] shadow-2xl border border-slate-100 mb-12 animate-pop no-print">
+                                <h3 className="text-sm font-black text-slate-400 uppercase mb-6 flex items-center gap-2">
+                                    <span className="w-2 h-2 bg-blue-500 rounded-full"></span> 신규 배정 등록
+                                </h3>
+                                <form onSubmit={handleAdd} className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div className="space-y-4">
+                                        <input type="text" placeholder="성함" value={form.name} onChange={e => setForm({...form, name: e.target.value})} className="w-full h-14 px-6 bg-slate-50 border-2 border-slate-100 rounded-2xl font-bold outline-none focus:border-blue-500 transition-colors" />
+                                        <select value={form.vehicle} onChange={e => setForm({...form, vehicle: e.target.value})} className="w-full h-14 px-6 bg-slate-50 border-2 border-slate-100 rounded-2xl font-bold outline-none">
+                                            {['버스 1호차', '버스 2호차', '버스 3호차', '개인차량', '교회차량'].map(v => <option key={v}>{v}</option>)}
                                         </select>
                                     </div>
-                                    <input type="text" placeholder="메모" value={form.memo} onChange={e => setForm({...form, memo: e.target.value})} className="w-full h-14 px-6 bg-slate-50 border-2 border-slate-100 rounded-2xl font-bold outline-none" />
-                                </div>
-                                <button className="md:col-span-2 h-16 bg-blue-600 text-white rounded-2xl font-black text-lg shadow-xl active:scale-[0.98] transition-all">배정 완료</button>
-                            </form>
-                        </section>
-                    )}
-
-                    <div className="relative mb-12 group">
-                        <input type="text" placeholder="이름을 입력하여 위치를 확인하세요..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="w-full h-20 bg-white border-4 border-slate-100 rounded-full px-16 font-black text-xl shadow-2xl outline-none focus:border-blue-500 transition-all" />
-                        <div className="absolute left-6 top-1/2 -translate-y-1/2 text-2xl opacity-20">🔍</div>
-                    </div>
-
-                    {/* 검색 결과 요약 (사용자 편의성 증대) */}
-                    {searchTerm.trim() !== '' && (
-                        <div className="mb-12 bg-blue-50 border-2 border-blue-100 p-6 rounded-[32px] animate-pop">
-                            <h4 className="text-sm font-black text-blue-400 uppercase mb-4">'{searchTerm}' 검색 결과 ({searchResults.length}건)</h4>
-                            <div className="flex flex-wrap gap-2">
-                                {searchResults.map(p => (
-                                    <button key={p.id} onClick={() => setSelectedItem(p)} className="bg-white border-2 border-blue-200 px-4 py-2 rounded-full text-sm font-black text-blue-600 hover:bg-blue-600 hover:text-white transition-all shadow-sm">
-                                        {p.name} ({p.vehicleType})
-                                    </button>
-                                ))}
-                                {searchResults.length === 0 && <p className="text-slate-400 font-bold text-sm">검색 결과가 없습니다.</p>}
-                            </div>
-                        </div>
-                    )}
-
-                    <div className="flex justify-around mb-16 text-center">
-                        <div><p className="text-[10px] font-black text-slate-300">버스 합계</p><p className="text-2xl font-black">{stats.b1+stats.b2+stats.b3}</p></div>
-                        <div><p className="text-[10px] font-black text-slate-300">개인차량</p><p className="text-2xl font-black text-emerald-500">{stats.priv}</p></div>
-                        <div><p className="text-[10px] font-black text-slate-300">교회차량</p><p className="text-2xl font-black text-amber-500">{stats.church}</p></div>
-                    </div>
-
-                    <section className="mb-20">
-                        <h2 className="text-2xl font-black text-slate-800 mb-10 border-l-8 border-blue-500 pl-4">🚌 버스 탑승 좌석도</h2>
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10">
-                            {renderBus('버스 1호차')}{renderBus('버스 2호차')}{renderBus('버스 3호차')}
-                        </div>
-                    </section>
-
-                    <section>
-                        <h2 className="text-2xl font-black text-slate-800 mb-10 border-l-8 border-slate-200 pl-4">🚗 기타 차량 배정 현황</h2>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                            {['개인차량', '교회차량'].map(cat => {
-                                // 검색 기능이 모든 차량 리스트에 즉시 반영되도록 필터링 로직 강화
-                                const list = data.filter(p => p.vehicleType === cat && (searchTerm.trim() === '' || p.name.includes(searchTerm.trim())));
-                                if (list.length === 0 && searchTerm.trim() === '') return null;
-                                return (
-                                    <div key={cat} className="mb-8">
-                                        <h3 className={`text-lg font-black mb-6 px-4 py-2 inline-block rounded-xl ${cat === '개인차량' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>{cat}</h3>
-                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                            {list.map(p => (
-                                                <div key={p.id} className="bg-white p-6 rounded-[32px] border-2 border-slate-50 shadow-sm hover:shadow-xl transition-all cursor-pointer group" onClick={() => setSelectedItem(p)}>
-                                                    <div className="flex justify-between items-start">
-                                                        <div>
-                                                            <div className="flex items-center gap-2 mb-2">
-                                                                <span className="text-xl font-black text-slate-800">{p.name}</span>
-                                                                {p.isDriver && <span className="bg-red-500 text-white text-[8px] px-1.5 py-0.5 rounded-md font-black">DRIVER</span>}
-                                                            </div>
-                                                            <div className="flex flex-col gap-1">
-                                                                <span className="text-[11px] font-black text-blue-600 bg-blue-50 px-2 py-0.5 rounded-lg w-fit">출발: {p.departure}</span>
-                                                                <p className="text-[10px] font-bold text-slate-400 line-clamp-1">{p.details}</p>
-                                                            </div>
-                                                        </div>
-                                                        {!isShareMode && <button onClick={e => { e.stopPropagation(); setConfirmId(p.id); }} className="text-slate-200 hover:text-red-500 text-xl transition-colors">✕</button>}
-                                                    </div>
-                                                </div>
-                                            ))}
+                                    <div className="space-y-4">
+                                        <div className="flex gap-2">
+                                            <select value={form.dep} onChange={e => setForm({...form, dep: e.target.value})} className="flex-1 h-14 px-4 bg-slate-50 border-2 border-slate-100 rounded-2xl font-bold text-sm">
+                                                {TIME_OPTIONS.map(t => <option key={t}>{t}</option>)}
+                                            </select>
+                                            <select value={form.ret} onChange={e => setForm({...form, ret: e.target.value})} className="flex-1 h-14 px-4 bg-slate-50 border-2 border-slate-100 rounded-2xl font-bold text-sm">
+                                                {TIME_OPTIONS.map(t => <option key={t}>{t}</option>)}
+                                            </select>
                                         </div>
+                                        <input type="text" placeholder="메모" value={form.memo} onChange={e => setForm({...form, memo: e.target.value})} className="w-full h-14 px-6 bg-slate-50 border-2 border-slate-100 rounded-2xl font-bold outline-none" />
                                     </div>
-                                );
-                            })}
+                                    <button className="md:col-span-2 h-16 bg-blue-600 text-white rounded-2xl font-black text-lg shadow-xl active:scale-[0.98] transition-all">배정 완료</button>
+                                </form>
+                            </section>
+                        )}
+
+                        <div className="relative mb-12 group no-print">
+                            <input type="text" placeholder="이름을 입력하여 위치를 확인하세요..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="w-full h-20 bg-white border-4 border-slate-100 rounded-full px-16 font-black text-xl shadow-2xl outline-none focus:border-blue-500 transition-all" />
+                            <div className="absolute left-6 top-1/2 -translate-y-1/2 text-2xl opacity-20">🔍</div>
                         </div>
-                    </section>
+
+                        {searchTerm.trim() !== '' && (
+                            <div className="mb-12 bg-blue-50 border-2 border-blue-100 p-6 rounded-[32px] animate-pop no-print">
+                                <h4 className="text-sm font-black text-blue-400 uppercase mb-4">'{searchTerm}' 검색 결과 ({searchResults.length}건)</h4>
+                                <div className="flex flex-wrap gap-2">
+                                    {searchResults.map(p => (
+                                        <button key={p.id} onClick={() => setSelectedItem(p)} className="bg-white border-2 border-blue-200 px-4 py-2 rounded-full text-sm font-black text-blue-600 hover:bg-blue-600 hover:text-white transition-all shadow-sm">
+                                            {p.name} ({p.vehicleType})
+                                        </button>
+                                    ))}
+                                    {searchResults.length === 0 && <p className="text-slate-400 font-bold text-sm">검색 결과가 없습니다.</p>}
+                                </div>
+                            </div>
+                        )}
+
+                        <div className="flex justify-around mb-16 text-center">
+                            <div><p className="text-[10px] font-black text-slate-300">버스 합계</p><p className="text-2xl font-black">{stats.b1+stats.b2+stats.b3}</p></div>
+                            <div><p className="text-[10px] font-black text-slate-300">개인차량</p><p className="text-2xl font-black text-emerald-500">{stats.priv}</p></div>
+                            <div><p className="text-[10px] font-black text-slate-300">교회차량</p><p className="text-2xl font-black text-amber-500">{stats.church}</p></div>
+                        </div>
+
+                        <section className="mb-20">
+                            <h2 className="text-2xl font-black text-slate-800 mb-10 border-l-8 border-blue-500 pl-4">🚌 버스 탑승 좌석도</h2>
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10">
+                                {renderBus('버스 1호차')}{renderBus('버스 2호차')}{renderBus('버스 3호차')}
+                            </div>
+                        </section>
+
+                        <section>
+                            <h2 className="text-2xl font-black text-slate-800 mb-10 border-l-8 border-slate-200 pl-4">🚗 기타 차량 배정 현황</h2>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                {['개인차량', '교회차량'].map(cat => {
+                                    const list = data.filter(p => p.vehicleType === cat && (searchTerm.trim() === '' || p.name.includes(searchTerm.trim())));
+                                    if (list.length === 0 && searchTerm.trim() === '') return null;
+                                    return (
+                                        <div key={cat} className="mb-8">
+                                            <h3 className={`text-lg font-black mb-6 px-4 py-2 inline-block rounded-xl ${cat === '개인차량' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>{cat}</h3>
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                                {list.map(p => (
+                                                    <div key={p.id} className="bg-white p-6 rounded-[32px] border-2 border-slate-50 shadow-sm hover:shadow-xl transition-all cursor-pointer group" onClick={() => setSelectedItem(p)}>
+                                                        <div className="flex justify-between items-start">
+                                                            <div>
+                                                                <div className="flex items-center gap-2 mb-2">
+                                                                    <span className="text-xl font-black text-slate-800">{p.name}</span>
+                                                                    {p.isDriver && <span className="bg-red-500 text-white text-[8px] px-1.5 py-0.5 rounded-md font-black">DRIVER</span>}
+                                                                </div>
+                                                                <div className="flex flex-col gap-1">
+                                                                    <span className="text-[11px] font-black text-blue-600 bg-blue-50 px-2 py-0.5 rounded-lg w-fit">출발: {p.departure}</span>
+                                                                    <p className="text-[10px] font-bold text-slate-400 line-clamp-1">{p.details}</p>
+                                                                </div>
+                                                            </div>
+                                                            {isAdmin && <button onClick={e => { e.stopPropagation(); setConfirmId(p.id); }} className="text-slate-200 hover:text-red-500 text-xl transition-colors no-print">✕</button>}
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </section>
+                    </div>
+                    {/* 캡처 구역 끝 */}
 
                     {confirmId && <DeleteConfirm name={data.find(p => p.id === confirmId)?.name} onConfirm={() => { setData(d => d.filter(p => p.id !== confirmId)); setConfirmId(null); }} onCancel={() => setConfirmId(null)} />}
                     
                     {selectedItem && (
-                        <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md" onClick={() => setSelectedItem(null)}>
+                        <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md no-print" onClick={() => setSelectedItem(null)}>
                             <div className="bg-white w-full max-w-lg rounded-[40px] overflow-hidden shadow-2xl animate-pop" onClick={e => e.stopPropagation()}>
                                 <div className={`p-10 ${selectedItem.vehicleType === '개인차량' ? 'bg-emerald-500' : selectedItem.vehicleType === '교회차량' ? 'bg-amber-500' : 'bg-blue-600'} text-white relative`}>
                                     <button onClick={() => setSelectedItem(null)} className="absolute top-6 right-6 w-10 h-10 flex items-center justify-center bg-black/10 rounded-full text-xl font-black">✕</button>
