@@ -162,6 +162,29 @@
         .info-table tr td:first-child { border-left: 1px solid #e2e8f0; border-radius: 12px 0 0 12px; }
         .info-table tr td:last-child { border-right: 1px solid #e2e8f0; border-radius: 0 12px 12px 0; }
         .large-font .info-table td { padding: 24px 16px; font-size: 1.2rem; font-weight: 700; }
+        
+        .name-edit-input {
+            width: 100%;
+            padding: 4px 8px;
+            border: 2px solid #3b82f6;
+            border-radius: 8px;
+            font-weight: 900;
+            outline: none;
+            background: #eff6ff;
+        }
+        
+        .group-separator {
+            height: 2px;
+            background: #e2e8f0;
+            margin: 12px 0;
+        }
+        .car-group-header {
+            font-size: 10px;
+            font-weight: 900;
+            color: #94a3b8;
+            padding: 8px 16px 4px;
+            text-transform: uppercase;
+        }
     </style>
 </head>
 <body class="text-slate-900">
@@ -244,7 +267,7 @@
             ];
             privateGroups.forEach(g => {
                 [g.dr, ...g.ps].forEach(name => {
-                    data.push({ id: `p-${name}`, name, vehicleType: '개인차량', groupId: g.gid, isDriver: name === g.dr, departure: g.dep, return: g.ret, details: g.note });
+                    data.push({ id: `p-${name}-${Date.now()}-${Math.random()}`, name, vehicleType: '개인차량', groupId: g.gid, isDriver: name === g.dr, departure: g.dep, return: g.ret, details: g.note });
                 });
             });
 
@@ -255,7 +278,7 @@
             ];
             churchGroups.forEach(g => {
                 g.members.forEach(name => {
-                    data.push({ id: `c-${name}`, name, vehicleType: '교회차량', groupId: g.gid, isDriver: false, departure: g.dep, return: g.ret, details: `${g.type} 이용` });
+                    data.push({ id: `c-${name}-${Date.now()}-${Math.random()}`, name, vehicleType: '교회차량', groupId: g.gid, isDriver: false, departure: g.dep, return: g.ret, details: `${g.type} 이용` });
                 });
             });
 
@@ -271,6 +294,10 @@
             const [confirmId, setConfirmId] = useState(null);
             const [isSharing, setIsSharing] = useState(false);
             
+            // 이름 수정용 상태
+            const [editingId, setEditingId] = useState(null);
+            const [tempName, setTempName] = useState('');
+
             const busRef = useRef(null);
             const privateRef = useRef(null);
             const churchRef = useRef(null);
@@ -278,12 +305,12 @@
             const [form, setForm] = useState({ name: '', vehicle: '선발대', dep: '2/23(월) 오전', ret: '2/25(수) 오전', memo: '' });
 
             useEffect(() => {
-                const saved = localStorage.getItem('retreat_2026_full_v9');
+                const saved = localStorage.getItem('retreat_2026_full_v10');
                 setData(saved ? JSON.parse(saved) : generateInitialData());
             }, []);
 
             useEffect(() => {
-                if (data.length > 0) localStorage.setItem('retreat_2026_full_v9', JSON.stringify(data));
+                if (data.length > 0) localStorage.setItem('retreat_2026_full_v10', JSON.stringify(data));
             }, [data]);
 
             const stats = useMemo(() => ({
@@ -302,23 +329,49 @@
             const handleAdd = (e) => {
                 e.preventDefault();
                 if (!form.name.trim()) return;
+                
+                let assignedGroupId = `group-${Date.now()}`;
+                let isDriver = false;
+
+                // 메모(form.memo)에 드라이버 이름이 포함되어 있는지 확인하여 그룹화
+                if (form.vehicle === '개인차량' || form.vehicle === '교회차량') {
+                    const match = data.find(p => p.vehicleType === form.vehicle && form.memo.includes(p.name) && p.isDriver);
+                    if (match) {
+                        assignedGroupId = match.groupId;
+                    }
+                    // 만약 메모가 비어있거나 본인이 드라이버인 경우 로직 (메모에 본인이름 적으면 드라이버로 인식)
+                    if (form.memo.includes('운전') || form.memo.includes('드라이버') || form.memo.includes('차량제공')) {
+                        isDriver = true;
+                    }
+                }
+
                 const busData = data.filter(p => p.vehicleType === form.vehicle);
                 let seat = 0;
                 const occupied = new Set(busData.map(p => p.seatPosition));
                 while (occupied.has(seat)) seat++;
 
                 const newItem = {
-                    id: `new-${Date.now()}`,
+                    id: `new-${Date.now()}-${Math.random()}`,
                     name: form.name.trim(),
                     vehicleType: form.vehicle,
                     departure: form.dep,
                     return: form.ret,
                     details: form.memo,
                     seatPosition: seat,
-                    groupId: `group-${Date.now()}`
+                    groupId: assignedGroupId,
+                    isDriver: isDriver
                 };
-                setData([newItem, ...data]);
+                setData([...data, newItem]);
                 setForm({ ...form, name: '', memo: '' });
+            };
+
+            const handleNameUpdate = (id) => {
+                if (!tempName.trim()) {
+                    setEditingId(null);
+                    return;
+                }
+                setData(prev => prev.map(p => p.id === id ? { ...p, name: tempName.trim() } : p));
+                setEditingId(null);
             };
 
             const handleSharePart = async (ref, filename) => {
@@ -411,36 +464,68 @@
             const renderTable = (cat) => {
                 const list = data.filter(p => p.vehicleType === cat && (searchTerm.trim() === '' || p.name.includes(searchTerm.trim())));
                 if (list.length === 0 && searchTerm.trim() === '') return null;
+
+                // 그룹화 정렬 (groupId별로 묶음)
+                const groupedList = [...list].sort((a, b) => a.groupId.localeCompare(b.groupId));
+                
+                let lastGroupId = '';
+
                 return (
-                    <table className="info-table">
-                        <thead>
-                            <tr>
-                                <th>성함</th>
-                                <th>출발일시</th>
-                                <th>메모/차량정보</th>
-                                {!isLargeFont && <th className="no-print">관리</th>}
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {list.map(p => (
-                                <tr key={p.id} onClick={() => setSelectedItem(p)} className="cursor-pointer hover:bg-slate-50">
-                                    <td className="font-black text-slate-900">
-                                        <div className="flex items-center gap-2">
-                                            {p.name}
-                                            {p.isDriver && <span className="bg-red-500 text-white text-[9px] px-1.5 py-0.5 rounded font-black">운전</span>}
-                                        </div>
-                                    </td>
-                                    <td className="text-blue-600 font-bold">{p.departure}</td>
-                                    <td className="text-slate-500 font-medium">{p.details}</td>
-                                    {!isLargeFont && (
-                                        <td className="no-print">
-                                            {isAdmin && <button onClick={e => { e.stopPropagation(); setConfirmId(p.id); }} className="text-red-500 font-black">✕</button>}
-                                        </td>
-                                    )}
+                    <div className="w-full">
+                        <table className="info-table">
+                            <thead>
+                                <tr>
+                                    <th className="w-1/4">성함 (클릭 시 수정)</th>
+                                    <th className="w-1/4">출발일시</th>
+                                    <th className="w-1/3">메모/차량정보</th>
+                                    {!isLargeFont && <th className="no-print w-1/12 text-center">삭제</th>}
                                 </tr>
-                            ))}
-                        </tbody>
-                    </table>
+                            </thead>
+                            <tbody>
+                                {groupedList.map(p => {
+                                    const showSeparator = lastGroupId !== '' && lastGroupId !== p.groupId;
+                                    lastGroupId = p.groupId;
+                                    
+                                    return (
+                                        <React.Fragment key={p.id}>
+                                            {showSeparator && (
+                                                <tr>
+                                                    <td colSpan={4} className="p-0 border-none"><div className="group-separator"></div></td>
+                                                </tr>
+                                            )}
+                                            <tr className="cursor-pointer hover:bg-slate-50 transition-colors">
+                                                <td className="font-black text-slate-900">
+                                                    {editingId === p.id ? (
+                                                        <input 
+                                                            autoFocus
+                                                            className="name-edit-input"
+                                                            value={tempName}
+                                                            onChange={e => setTempName(e.target.value)}
+                                                            onBlur={() => handleNameUpdate(p.id)}
+                                                            onKeyDown={e => e.key === 'Enter' && handleNameUpdate(p.id)}
+                                                        />
+                                                    ) : (
+                                                        <div className="flex items-center gap-2 group relative" onClick={(e) => { e.stopPropagation(); setEditingId(p.id); setTempName(p.name); }}>
+                                                            <span className="border-b border-dotted border-slate-300">{p.name}</span>
+                                                            {p.isDriver && <span className="bg-red-600 text-white text-[9px] px-1.5 py-0.5 rounded font-black">드라이버</span>}
+                                                            <span className="opacity-0 group-hover:opacity-40 text-[9px] ml-1">✏️</span>
+                                                        </div>
+                                                    )}
+                                                </td>
+                                                <td className="text-blue-600 font-bold" onClick={() => setSelectedItem(p)}>{p.departure}</td>
+                                                <td className="text-slate-500 font-medium" onClick={() => setSelectedItem(p)}>{p.details}</td>
+                                                {!isLargeFont && (
+                                                    <td className="no-print text-center">
+                                                        {isAdmin && <button onClick={e => { e.stopPropagation(); setConfirmId(p.id); }} className="w-8 h-8 rounded-full bg-red-50 text-red-500 hover:bg-red-500 hover:text-white transition-all font-black">✕</button>}
+                                                    </td>
+                                                )}
+                                            </tr>
+                                        </React.Fragment>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
+                    </div>
                 );
             };
 
@@ -471,7 +556,7 @@
                     {!isLargeFont && isAdmin && (
                         <section className="bg-white p-8 rounded-[40px] shadow-2xl border border-slate-100 mb-12 animate-pop no-print">
                             <h3 className="text-sm font-black text-slate-400 uppercase mb-6 flex items-center gap-2">
-                                <span className="w-2 h-2 bg-blue-500 rounded-full"></span> 신규 배정 등록
+                                <span className="w-2 h-2 bg-blue-500 rounded-full"></span> 신규 배정 등록 (메모에 드라이버 이름 입력 시 자동 정렬)
                             </h3>
                             <form onSubmit={handleAdd} className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <div className="space-y-4">
@@ -489,9 +574,9 @@
                                             {TIME_OPTIONS.map(t => <option key={t}>{t}</option>)}
                                         </select>
                                     </div>
-                                    <input type="text" placeholder="메모" value={form.memo} onChange={e => setForm({...form, memo: e.target.value})} className="w-full h-14 px-6 bg-slate-50 border-2 border-slate-100 rounded-2xl font-bold outline-none" />
+                                    <input type="text" placeholder="메모 (예: 홍길동B 차량 동승, 드라이버 등)" value={form.memo} onChange={e => setForm({...form, memo: e.target.value})} className="w-full h-14 px-6 bg-slate-50 border-2 border-slate-100 rounded-2xl font-bold outline-none" />
                                 </div>
-                                <button className="md:col-span-2 h-16 bg-blue-600 text-white rounded-2xl font-black text-lg shadow-xl">배정 완료</button>
+                                <button className="md:col-span-2 h-16 bg-blue-600 text-white rounded-2xl font-black text-lg shadow-xl active:scale-95 transition-all">배정 완료</button>
                             </form>
                         </section>
                     )}
@@ -519,7 +604,7 @@
 
                     <section className="mb-20">
                         <div className="flex justify-between items-center mb-10 no-print">
-                            <h2 className="text-2xl font-black text-slate-800 border-l-8 border-emerald-500 pl-4">🚗 개인차량 현황</h2>
+                            <h2 className="text-2xl font-black text-slate-800 border-l-8 border-emerald-500 pl-4">🚗 개인차량 현황 (이름 클릭 시 수정)</h2>
                             <button onClick={() => handleSharePart(privateRef, '개인차량_명단')} className="bg-emerald-600 text-white px-4 py-2 rounded-xl text-[10px] font-black shadow-lg">개인차량 저장</button>
                         </div>
                         <div ref={privateRef} className="overflow-x-auto p-2">
