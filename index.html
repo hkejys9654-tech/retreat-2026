@@ -165,12 +165,13 @@
         
         .name-edit-input {
             width: 100%;
-            padding: 4px 8px;
+            padding: 8px 12px;
             border: 2px solid #3b82f6;
-            border-radius: 8px;
+            border-radius: 12px;
             font-weight: 900;
             outline: none;
             background: #eff6ff;
+            font-size: 14px;
         }
         
         .group-separator {
@@ -185,6 +186,16 @@
             padding: 8px 16px 4px;
             text-transform: uppercase;
         }
+        .action-btn {
+            padding: 6px 10px;
+            border-radius: 10px;
+            font-weight: 900;
+            font-size: 11px;
+            transition: all 0.2s;
+        }
+        .save-btn { background: #10b981; color: white; }
+        .cancel-btn { background: #94a3b8; color: white; }
+        .add-passenger-btn { background: #3b82f6; color: white; margin-left: 8px; font-size: 10px; padding: 2px 6px; border-radius: 6px; }
     </style>
 </head>
 <body class="text-slate-900">
@@ -205,7 +216,7 @@
                 if (!name) return;
                 const seatPosition = row * 4 + col;
                 data.push({
-                    id: `${vehicle}-${row}-${col}-${name}`,
+                    id: `${vehicle}-${row}-${col}-${name}-${Math.random()}`,
                     name,
                     vehicleType: vehicle,
                     departure: '2/23(월) 오전',
@@ -271,17 +282,6 @@
                 });
             });
 
-            const churchGroups = [
-                { gid: 'c1', type: '스타리아 A', dep: '2/23(월) 오전 07:00', ret: '2/23(월) 저녁', members: ["김석권", "김재중", "유현", "김대중", "김동만", "최재영", "문병용"] },
-                { gid: 'c2', type: '스타렉스 B', dep: '2/23(월) 저녁 19:40', ret: '2/24(화) 저녁', members: ["강지승", "손형환", "최영현", "황규연", "노우석", "서부석", "문성혁"] },
-                { gid: 'c3', type: '스타리아 C', dep: '2/24(화) 저녁 19:30', ret: '2/25(수) 오전', members: ["장세혁", "김상준", "김승완", "김용성", "차동철", "김용걸"] }
-            ];
-            churchGroups.forEach(g => {
-                g.members.forEach(name => {
-                    data.push({ id: `c-${name}-${Date.now()}-${Math.random()}`, name, vehicleType: '교회차량', groupId: g.gid, isDriver: false, departure: g.dep, return: g.ret, details: `${g.type} 이용` });
-                });
-            });
-
             return data;
         };
 
@@ -294,9 +294,9 @@
             const [confirmId, setConfirmId] = useState(null);
             const [isSharing, setIsSharing] = useState(false);
             
-            // 이름 수정용 상태
+            // 수정용 통합 상태
             const [editingId, setEditingId] = useState(null);
-            const [tempName, setTempName] = useState('');
+            const [editForm, setEditForm] = useState({ name: '', departure: '', return: '', details: '' });
 
             const busRef = useRef(null);
             const privateRef = useRef(null);
@@ -305,12 +305,12 @@
             const [form, setForm] = useState({ name: '', vehicle: '선발대', dep: '2/23(월) 오전', ret: '2/25(수) 오전', memo: '' });
 
             useEffect(() => {
-                const saved = localStorage.getItem('retreat_2026_full_v10');
+                const saved = localStorage.getItem('retreat_2026_full_v11');
                 setData(saved ? JSON.parse(saved) : generateInitialData());
             }, []);
 
             useEffect(() => {
-                if (data.length > 0) localStorage.setItem('retreat_2026_full_v10', JSON.stringify(data));
+                if (data.length > 0) localStorage.setItem('retreat_2026_full_v11', JSON.stringify(data));
             }, [data]);
 
             const stats = useMemo(() => ({
@@ -333,13 +333,11 @@
                 let assignedGroupId = `group-${Date.now()}`;
                 let isDriver = false;
 
-                // 메모(form.memo)에 드라이버 이름이 포함되어 있는지 확인하여 그룹화
                 if (form.vehicle === '개인차량' || form.vehicle === '교회차량') {
                     const match = data.find(p => p.vehicleType === form.vehicle && form.memo.includes(p.name) && p.isDriver);
                     if (match) {
                         assignedGroupId = match.groupId;
                     }
-                    // 만약 메모가 비어있거나 본인이 드라이버인 경우 로직 (메모에 본인이름 적으면 드라이버로 인식)
                     if (form.memo.includes('운전') || form.memo.includes('드라이버') || form.memo.includes('차량제공')) {
                         isDriver = true;
                     }
@@ -363,15 +361,31 @@
                 };
                 setData([...data, newItem]);
                 setForm({ ...form, name: '', memo: '' });
+                // 최상단으로 스크롤 이동하여 확인 가능하게 함
+                window.scrollTo({ top: 0, behavior: 'smooth' });
             };
 
-            const handleNameUpdate = (id) => {
-                if (!tempName.trim()) {
-                    setEditingId(null);
-                    return;
-                }
-                setData(prev => prev.map(p => p.id === id ? { ...p, name: tempName.trim() } : p));
+            const startEditing = (p) => {
+                setEditingId(p.id);
+                setEditForm({ name: p.name, departure: p.departure, return: p.return, details: p.details || '' });
+            };
+
+            const handleUpdateRow = (id) => {
+                setData(prev => prev.map(p => p.id === id ? { ...p, ...editForm } : p));
                 setEditingId(null);
+            };
+
+            const addPassengerToDriver = (driver) => {
+                setForm({
+                    ...form,
+                    vehicle: driver.vehicleType,
+                    dep: driver.departure,
+                    ret: driver.return,
+                    memo: `${driver.name} 차량 동승`
+                });
+                // 입력 필드 쪽으로 포커스
+                document.querySelector('input[placeholder="성함"]')?.focus();
+                window.scrollTo({ top: 200, behavior: 'smooth' });
             };
 
             const handleSharePart = async (ref, filename) => {
@@ -465,9 +479,7 @@
                 const list = data.filter(p => p.vehicleType === cat && (searchTerm.trim() === '' || p.name.includes(searchTerm.trim())));
                 if (list.length === 0 && searchTerm.trim() === '') return null;
 
-                // 그룹화 정렬 (groupId별로 묶음)
-                const groupedList = [...list].sort((a, b) => a.groupId.localeCompare(b.groupId));
-                
+                const groupedList = [...list].sort((a, b) => a.groupId.localeCompare(b.groupId) || (b.isDriver ? 1 : -1));
                 let lastGroupId = '';
 
                 return (
@@ -475,50 +487,76 @@
                         <table className="info-table">
                             <thead>
                                 <tr>
-                                    <th className="w-1/4">성함 (클릭 시 수정)</th>
-                                    <th className="w-1/4">출발일시</th>
-                                    <th className="w-1/3">메모/차량정보</th>
-                                    {!isLargeFont && <th className="no-print w-1/12 text-center">삭제</th>}
+                                    <th className="w-[18%]">성함</th>
+                                    <th className="w-[18%]">출발</th>
+                                    <th className="w-[18%]">도착(귀가)</th>
+                                    <th className="w-[30%]">메모/차량정보</th>
+                                    <th className="no-print w-[16%] text-center">관리</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {groupedList.map(p => {
+                                    const isEditing = editingId === p.id;
                                     const showSeparator = lastGroupId !== '' && lastGroupId !== p.groupId;
                                     lastGroupId = p.groupId;
                                     
                                     return (
                                         <React.Fragment key={p.id}>
                                             {showSeparator && (
-                                                <tr>
-                                                    <td colSpan={4} className="p-0 border-none"><div className="group-separator"></div></td>
-                                                </tr>
+                                                <tr><td colSpan={5} className="p-0 border-none"><div className="group-separator"></div></td></tr>
                                             )}
-                                            <tr className="cursor-pointer hover:bg-slate-50 transition-colors">
-                                                <td className="font-black text-slate-900">
-                                                    {editingId === p.id ? (
-                                                        <input 
-                                                            autoFocus
-                                                            className="name-edit-input"
-                                                            value={tempName}
-                                                            onChange={e => setTempName(e.target.value)}
-                                                            onBlur={() => handleNameUpdate(p.id)}
-                                                            onKeyDown={e => e.key === 'Enter' && handleNameUpdate(p.id)}
-                                                        />
+                                            <tr className={`${isEditing ? 'bg-blue-50' : 'hover:bg-slate-50'} transition-colors`}>
+                                                <td className="font-black">
+                                                    {isEditing ? (
+                                                        <input className="name-edit-input" value={editForm.name} onChange={e => setEditForm({...editForm, name: e.target.value})} />
                                                     ) : (
-                                                        <div className="flex items-center gap-2 group relative" onClick={(e) => { e.stopPropagation(); setEditingId(p.id); setTempName(p.name); }}>
-                                                            <span className="border-b border-dotted border-slate-300">{p.name}</span>
-                                                            {p.isDriver && <span className="bg-red-600 text-white text-[9px] px-1.5 py-0.5 rounded font-black">드라이버</span>}
-                                                            <span className="opacity-0 group-hover:opacity-40 text-[9px] ml-1">✏️</span>
+                                                        <div className="flex items-center gap-1">
+                                                            <span className="text-slate-900">{p.name}</span>
+                                                            {p.isDriver && (
+                                                                <div className="flex items-center">
+                                                                    <span className="bg-red-600 text-white text-[9px] px-1.5 py-0.5 rounded font-black">드라이버</span>
+                                                                    <button onClick={() => addPassengerToDriver(p)} className="add-passenger-btn no-print" title="탑승자 추가">+ 탑승</button>
+                                                                </div>
+                                                            )}
                                                         </div>
                                                     )}
                                                 </td>
-                                                <td className="text-blue-600 font-bold" onClick={() => setSelectedItem(p)}>{p.departure}</td>
-                                                <td className="text-slate-500 font-medium" onClick={() => setSelectedItem(p)}>{p.details}</td>
-                                                {!isLargeFont && (
-                                                    <td className="no-print text-center">
-                                                        {isAdmin && <button onClick={e => { e.stopPropagation(); setConfirmId(p.id); }} className="w-8 h-8 rounded-full bg-red-50 text-red-500 hover:bg-red-500 hover:text-white transition-all font-black">✕</button>}
-                                                    </td>
-                                                )}
+                                                <td>
+                                                    {isEditing ? (
+                                                        <select className="name-edit-input" value={editForm.departure} onChange={e => setEditForm({...editForm, departure: e.target.value})}>
+                                                            {TIME_OPTIONS.map(t => <option key={t}>{t}</option>)}
+                                                        </select>
+                                                    ) : <span className="text-blue-600 font-bold text-sm">{p.departure}</span>}
+                                                </td>
+                                                <td>
+                                                    {isEditing ? (
+                                                        <select className="name-edit-input" value={editForm.return} onChange={e => setEditForm({...editForm, return: e.target.value})}>
+                                                            {TIME_OPTIONS.map(t => <option key={t}>{t}</option>)}
+                                                        </select>
+                                                    ) : <span className="text-slate-500 font-bold text-sm">{p.return}</span>}
+                                                </td>
+                                                <td>
+                                                    {isEditing ? (
+                                                        <input className="name-edit-input" value={editForm.details} onChange={e => setEditForm({...editForm, details: e.target.value})} placeholder="차량정보 또는 메모" />
+                                                    ) : <span className="text-slate-500 font-medium text-sm line-clamp-1">{p.details}</span>}
+                                                </td>
+                                                <td className="no-print text-center">
+                                                    {isAdmin && (
+                                                        <div className="flex gap-1 justify-center">
+                                                            {isEditing ? (
+                                                                <>
+                                                                    <button onClick={() => handleUpdateRow(p.id)} className="action-btn save-btn">저장</button>
+                                                                    <button onClick={() => setEditingId(null)} className="action-btn cancel-btn">취소</button>
+                                                                </>
+                                                            ) : (
+                                                                <>
+                                                                    <button onClick={() => startEditing(p)} className="action-btn bg-slate-100 text-slate-600 hover:bg-slate-200">수정</button>
+                                                                    <button onClick={() => setConfirmId(p.id)} className="action-btn bg-red-50 text-red-500 hover:bg-red-500 hover:text-white">✕</button>
+                                                                </>
+                                                            )}
+                                                        </div>
+                                                    )}
+                                                </td>
                                             </tr>
                                         </React.Fragment>
                                     );
@@ -556,25 +594,31 @@
                     {!isLargeFont && isAdmin && (
                         <section className="bg-white p-8 rounded-[40px] shadow-2xl border border-slate-100 mb-12 animate-pop no-print">
                             <h3 className="text-sm font-black text-slate-400 uppercase mb-6 flex items-center gap-2">
-                                <span className="w-2 h-2 bg-blue-500 rounded-full"></span> 신규 배정 등록 (메모에 드라이버 이름 입력 시 자동 정렬)
+                                <span className="w-2 h-2 bg-blue-500 rounded-full"></span> 신규 배정 등록
                             </h3>
                             <form onSubmit={handleAdd} className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <div className="space-y-4">
-                                    <input type="text" placeholder="성함" value={form.name} onChange={e => setForm({...form, name: e.target.value})} className="w-full h-14 px-6 bg-slate-50 border-2 border-slate-100 rounded-2xl font-bold outline-none" />
+                                    <input type="text" placeholder="성함" value={form.name} onChange={e => setForm({...form, name: e.target.value})} className="w-full h-14 px-6 bg-slate-50 border-2 border-slate-100 rounded-2xl font-bold outline-none focus:border-blue-500" />
                                     <select value={form.vehicle} onChange={e => setForm({...form, vehicle: e.target.value})} className="w-full h-14 px-6 bg-slate-50 border-2 border-slate-100 rounded-2xl font-bold outline-none">
                                         {['선발대', '2호차', '3호차', '개인차량', '교회차량'].map(v => <option key={v}>{v}</option>)}
                                     </select>
                                 </div>
                                 <div className="space-y-4">
                                     <div className="flex gap-2">
-                                        <select value={form.dep} onChange={e => setForm({...form, dep: e.target.value})} className="flex-1 h-14 px-4 bg-slate-50 border-2 border-slate-100 rounded-2xl font-bold text-sm">
-                                            {TIME_OPTIONS.map(t => <option key={t}>{t}</option>)}
-                                        </select>
-                                        <select value={form.ret} onChange={e => setForm({...form, ret: e.target.value})} className="flex-1 h-14 px-4 bg-slate-50 border-2 border-slate-100 rounded-2xl font-bold text-sm">
-                                            {TIME_OPTIONS.map(t => <option key={t}>{t}</option>)}
-                                        </select>
+                                        <div className="flex-1">
+                                            <p className="text-[10px] font-black text-slate-400 mb-1 ml-2">출발일시</p>
+                                            <select value={form.dep} onChange={e => setForm({...form, dep: e.target.value})} className="w-full h-14 px-4 bg-slate-50 border-2 border-slate-100 rounded-2xl font-bold text-sm">
+                                                {TIME_OPTIONS.map(t => <option key={t}>{t}</option>)}
+                                            </select>
+                                        </div>
+                                        <div className="flex-1">
+                                            <p className="text-[10px] font-black text-slate-400 mb-1 ml-2">도착(귀가)</p>
+                                            <select value={form.ret} onChange={e => setForm({...form, ret: e.target.value})} className="w-full h-14 px-4 bg-slate-50 border-2 border-slate-100 rounded-2xl font-bold text-sm">
+                                                {TIME_OPTIONS.map(t => <option key={t}>{t}</option>)}
+                                            </select>
+                                        </div>
                                     </div>
-                                    <input type="text" placeholder="메모 (예: 홍길동B 차량 동승, 드라이버 등)" value={form.memo} onChange={e => setForm({...form, memo: e.target.value})} className="w-full h-14 px-6 bg-slate-50 border-2 border-slate-100 rounded-2xl font-bold outline-none" />
+                                    <input type="text" placeholder="메모 (예: 홍길동B 차량 동승, 드라이버 등)" value={form.memo} onChange={e => setForm({...form, memo: e.target.value})} className="w-full h-14 px-6 bg-slate-50 border-2 border-slate-100 rounded-2xl font-bold outline-none focus:border-emerald-500" />
                                 </div>
                                 <button className="md:col-span-2 h-16 bg-blue-600 text-white rounded-2xl font-black text-lg shadow-xl active:scale-95 transition-all">배정 완료</button>
                             </form>
@@ -604,7 +648,7 @@
 
                     <section className="mb-20">
                         <div className="flex justify-between items-center mb-10 no-print">
-                            <h2 className="text-2xl font-black text-slate-800 border-l-8 border-emerald-500 pl-4">🚗 개인차량 현황 (이름 클릭 시 수정)</h2>
+                            <h2 className="text-2xl font-black text-slate-800 border-l-8 border-emerald-500 pl-4">🚗 개인차량 현황 (전 필드 수정 가능)</h2>
                             <button onClick={() => handleSharePart(privateRef, '개인차량_명단')} className="bg-emerald-600 text-white px-4 py-2 rounded-xl text-[10px] font-black shadow-lg">개인차량 저장</button>
                         </div>
                         <div ref={privateRef} className="overflow-x-auto p-2">
