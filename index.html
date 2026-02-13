@@ -154,30 +154,70 @@
             '2/25(수) 오전'
         ];
 
+        // 이미지에 명시된 행(row)과 열(column)을 기반으로 데이터 생성
         const generateInitialData = () => {
             const data = [];
-            const b1 = ["윤해권", "배현기", "송기호", "서영진", "공현애", "노민숙", "박순", "김윤희", "최정숙", "김진희", "박영자", "이명숙", "김숙희", "이혜령", "이은자", "이순례", "김애숙", "정영란", "백종미", "이순희", "정동규", "이정희", "신효성", "박영미", "김다운", "박미순", "양란희", "안상아", "한은경", "조광순", "허경심", "노연미", "김연화", "문춘자", "윤미애", "김애란", "박복순", "김숙영", "이미경", "이강자"];
-            b1.forEach((n, i) => {
-                const isRight = i >= 20;
-                const seat = (Math.floor((i % 20) / 2) * 4) + (isRight ? 2 : 0) + (i % 2);
-                data.push({ id: `b1-${i}`, name: n, vehicleType: '버스 1호차', departure: '2/23(월) 오전', return: '2/25(수) 오전', seatPosition: seat, groupId: 'bus1' });
-            });
 
-            // 버스 2호차: 김석옥 -> 김성옥 수정
-            const b2 = ["양회순", "이양호", "이춘선", "김성옥", "문정옥", "황연숙", "최은희", "이미숙", "양희경", "강정인", "김소영", "자녀1", "김인숙", "황재향", "안윤미", "자녀1", "이효재", "이효주", "김이숙", "박유미", "임찬동", "김순종", "안재호", "김성표", "이미정", "강동희", "박영심", "박승희", "박정아", "정수진", "김순요", "김덕순", "자녀1", "자녀2", "장소희", "배소영", "이효준", "박미현"];
-            b2.forEach((n, i) => {
-                const isRight = i >= 20;
-                const seat = (Math.floor((i % 20) / 2) * 4) + (isRight ? 2 : 0) + (i % 2);
-                data.push({ id: `b2-${i}`, name: n, vehicleType: '버스 2호차', departure: '2/23(월) 오전', return: '2/25(수) 오전', seatPosition: seat, groupId: 'bus2' });
-            });
+            // 보조 함수: 특정 위치에 좌석 배치
+            const addSeat = (vehicle, row, col, name) => {
+                if (!name) return;
+                const seatPosition = row * 4 + col;
+                data.push({
+                    id: `${vehicle}-${row}-${col}-${name}`,
+                    name,
+                    vehicleType: vehicle,
+                    departure: '2/23(월) 오전',
+                    return: '2/25(수) 오전',
+                    seatPosition,
+                    groupId: vehicle === '선발대' ? 'bus1' : vehicle === '2호차' ? 'bus2' : 'bus3'
+                });
+            };
 
-            const b3 = ["정해웅", "송희상", "정찬삼", "이상교", "정형우", "고영진", "서태웅", "이성헌", "정주영", "양현준", "이예은", "조은혜", "이효진", "김경만", "나병상", "송국한", "송정한", "김성오", "이준서", "정현진", "고영서", "양유진", "배다빈", "오태희", "강선미", "이서린"];
-            b3.forEach((n, i) => {
-                const isRight = i >= 13;
-                const seat = (Math.floor((i % 13) / 2) * 4) + (isRight ? 2 : 0) + (i % 2);
-                data.push({ id: `b3-${i}`, name: n, vehicleType: '버스 3호차', departure: '2/23(월) 오전', return: '2/25(수) 오전', seatPosition: seat, groupId: 'bus3' });
-            });
+            // 선발대 (이미지 1열-4열 기준)
+            const b1_raw = [
+                ["박미순", "박순", "신효성", "박영미"],
+                ["박승희", "윤미애", "공현애", "노민숙"],
+                ["황재향", "허경심", "최정숙", "김윤희"],
+                ["김인숙", "조광순", "백종미", "김연화"],
+                ["김애숙", "이명숙", "강동희", "문정옥"],
+                ["박복순", "문춘자", "이봉임", "김숙영"],
+                ["김애란", "안상아", "이미경", "장소희"],
+                ["이은자", "한은경", "윤하진", "윤하준"],
+                ["황연숙", null, null, null]
+            ];
+            b1_raw.forEach((row, rIdx) => row.forEach((name, cIdx) => addSeat('선발대', rIdx, cIdx, name)));
 
+            // 2호차 (이미지 중간 구역 기준)
+            const b2_raw = [
+                ["윤해권", "배현기", "양회순", "이양호"],
+                ["송기호", "서영진", "이춘선", "김성옥"],
+                ["정동규", "이정희", "임찬동", "김순종"],
+                ["박영자", "김진희", "안재호", "김성표"],
+                ["김숙희", "이혜령", "최은희", "이미숙"],
+                ["김다운", "이순례", "양희경", "강정인"],
+                ["양란희", "정영란", "김소영", "자녀1"],
+                ["노연미", "이순희", "정수진", "이미정"],
+                ["김애란", "이강자(귀가)", "김덕순", "박영심"],
+                ["안윤미", "자녀1", "김이숙", "박정아"],
+                ["이효재", "이효주", null, null],
+                ["이효준", null, "박미현", "김순요"]
+            ];
+            b2_raw.forEach((row, rIdx) => row.forEach((name, cIdx) => addSeat('2호차', rIdx, cIdx, name)));
+
+            // 3호차 (이미지 우측 구역 기준)
+            const b3_raw = [
+                ["정해웅", "송희상", "김경만", "나병상"],
+                ["정찬삼", "이상교", "속국한", "송정한"],
+                ["정형우", "고영진", "김성오", null],
+                ["서태웅", "이성헌", "이준서", "정현진"],
+                ["정주영", "양현준", "고영서", "양유진"],
+                ["이예은", "조은혜B", "배다빈", "오태희"],
+                ["이효진", null, "강선미", "이서린"],
+                ["배소영", "박유미", null, null]
+            ];
+            b3_raw.forEach((row, rIdx) => row.forEach((name, cIdx) => addSeat('3호차', rIdx, cIdx, name)));
+
+            // 기타 차량 정보 (기존 데이터 유지)
             const privateGroups = [
                 { gid: 'p1', dr: '나수금', ps: ["이영욱", "이경애", "이혜령", "박유미"], dep: '2/23(월) 저녁', ret: '2/24(화) 저녁', note: '나수금S 차량 | 귀가시 이혜령, 박유미 동승' },
                 { gid: 'p2', dr: '고홍석', ps: ["이철귀"], dep: '2/23(월) 오후', ret: '2/24(화) 저녁', note: '고홍석B 차량' },
@@ -234,21 +274,21 @@
             
             const captureRef = useRef(null);
 
-            const [form, setForm] = useState({ name: '', vehicle: '버스 1호차', dep: '2/23(월) 오전', ret: '2/25(수) 오전', memo: '' });
+            const [form, setForm] = useState({ name: '', vehicle: '선발대', dep: '2/23(월) 오전', ret: '2/25(수) 오전', memo: '' });
 
             useEffect(() => {
-                const saved = localStorage.getItem('retreat_2026_full_v6');
+                const saved = localStorage.getItem('retreat_2026_full_v8');
                 setData(saved ? JSON.parse(saved) : generateInitialData());
             }, []);
 
             useEffect(() => {
-                if (data.length > 0) localStorage.setItem('retreat_2026_full_v6', JSON.stringify(data));
+                if (data.length > 0) localStorage.setItem('retreat_2026_full_v8', JSON.stringify(data));
             }, [data]);
 
             const stats = useMemo(() => ({
-                b1: data.filter(p => p.vehicleType === '버스 1호차').length,
-                b2: data.filter(p => p.vehicleType === '버스 2호차').length,
-                b3: data.filter(p => p.vehicleType === '버스 3호차').length,
+                b1: data.filter(p => p.vehicleType === '선발대').length,
+                b2: data.filter(p => p.vehicleType === '2호차').length,
+                b3: data.filter(p => p.vehicleType === '3호차').length,
                 priv: data.filter(p => p.vehicleType === '개인차량').length,
                 church: data.filter(p => p.vehicleType === '교회차량').length,
             }), [data]);
@@ -301,13 +341,11 @@
                 setDraggedId(null);
             };
 
-            // 고급 공유 기능: 이미지 캡처 후 Web Share API 사용
             const handleShare = async () => {
                 if (!captureRef.current) return;
                 setIsSharing(true);
                 
                 try {
-                    // html2canvas 옵션: no-print 클래스를 가진 요소를 제외하고 캡처
                     const canvas = await html2canvas(captureRef.current, {
                         useCORS: true,
                         scale: 2,
@@ -319,7 +357,6 @@
                     const blob = await (await fetch(dataUrl)).blob();
                     const file = new File([blob], '2026_수련회_차량배정.png', { type: 'image/png' });
 
-                    // Web Share API 지원 여부 확인
                     if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
                         await navigator.share({
                             files: [file],
@@ -327,7 +364,6 @@
                             text: '차량 배정 현황 공유드립니다.',
                         });
                     } else {
-                        // 미지원 시 다운로드 처리
                         const link = document.createElement('a');
                         link.href = dataUrl;
                         link.download = '2026_수련회_차량배정.png';
@@ -343,8 +379,7 @@
 
             const renderBus = (type) => {
                 const members = data.filter(p => p.vehicleType === type);
-                const capacity = type === '버스 2호차' ? 47 : 45;
-                const remaining = capacity - members.length;
+                const capacity = type === '2호차' ? 48 : 48; // 행 12개 x 4열
 
                 return (
                     <div className="bus-container animate-pop">
@@ -400,10 +435,6 @@
                                 }))}
                             </div>
                         </div>
-                        <div className="mt-6 pt-4 border-t-2 border-slate-50 flex justify-center items-center gap-2">
-                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Remaining</span>
-                            <span className="bg-blue-600 text-white px-3 py-1 rounded-full text-xs font-black shadow-lg shadow-blue-200">{remaining}석</span>
-                        </div>
                     </div>
                 );
             };
@@ -415,7 +446,6 @@
 
             return (
                 <div className="max-w-6xl mx-auto px-4 py-8 pb-32">
-                    {/* 공유 로딩 오버레이 */}
                     {isSharing && (
                         <div className="loading-overlay">
                             <div className="spinner"></div>
@@ -438,9 +468,7 @@
                         </div>
                     </header>
 
-                    {/* 캡처 구역 시작 */}
                     <div ref={captureRef} id="capture-area" className="bg-transparent p-2">
-                        {/* 캡처/인쇄용 제목 (평소엔 숨김) */}
                         <div className="hidden print:block mb-8 text-center border-b-4 border-slate-900 pb-4">
                             <h1 className="text-4xl font-black mb-1">2026 전도인 수련회 차량 배정 현황</h1>
                             <p className="text-slate-500 font-bold">작성 일시: {new Date().toLocaleDateString()} {new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</p>
@@ -455,7 +483,7 @@
                                     <div className="space-y-4">
                                         <input type="text" placeholder="성함" value={form.name} onChange={e => setForm({...form, name: e.target.value})} className="w-full h-14 px-6 bg-slate-50 border-2 border-slate-100 rounded-2xl font-bold outline-none focus:border-blue-500 transition-colors" />
                                         <select value={form.vehicle} onChange={e => setForm({...form, vehicle: e.target.value})} className="w-full h-14 px-6 bg-slate-50 border-2 border-slate-100 rounded-2xl font-bold outline-none">
-                                            {['버스 1호차', '버스 2호차', '버스 3호차', '개인차량', '교회차량'].map(v => <option key={v}>{v}</option>)}
+                                            {['선발대', '2호차', '3호차', '개인차량', '교회차량'].map(v => <option key={v}>{v}</option>)}
                                         </select>
                                     </div>
                                     <div className="space-y-4">
@@ -502,7 +530,7 @@
                         <section className="mb-20">
                             <h2 className="text-2xl font-black text-slate-800 mb-10 border-l-8 border-blue-500 pl-4">🚌 버스 탑승 좌석도</h2>
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10">
-                                {renderBus('버스 1호차')}{renderBus('버스 2호차')}{renderBus('버스 3호차')}
+                                {renderBus('선발대')}{renderBus('2호차')}{renderBus('3호차')}
                             </div>
                         </section>
 
@@ -540,7 +568,6 @@
                             </div>
                         </section>
                     </div>
-                    {/* 캡처 구역 끝 */}
 
                     {confirmId && <DeleteConfirm name={data.find(p => p.id === confirmId)?.name} onConfirm={() => { setData(d => d.filter(p => p.id !== confirmId)); setConfirmId(null); }} onCancel={() => setConfirmId(null)} />}
                     
