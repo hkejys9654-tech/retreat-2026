@@ -11,7 +11,6 @@
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    <!-- 화면 캡처 라이브러리 추가 -->
     <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
 
     <style>
@@ -29,6 +28,15 @@
             box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1);
             position: relative;
         }
+        /* 큰 글자 모드 스타일 강제 적용 */
+        .large-font .seat { height: 56px; font-size: 18px !important; font-weight: 900 !important; color: #000 !important; }
+        .large-font h1 { font-size: 3.5rem !important; }
+        .large-font h2 { font-size: 2.5rem !important; }
+        .large-font h3 { font-size: 1.8rem !important; }
+        .large-font .text-xs { font-size: 1rem !important; }
+        .large-font .text-sm { font-size: 1.2rem !important; }
+        .large-font .bus-container { border-width: 6px; }
+
         .bus-head {
             height: 60px;
             border-bottom: 2px dashed #cbd5e1;
@@ -52,17 +60,17 @@
             position: relative;
         }
         .seat-occupied {
-            background-color: #fbbf24;
-            color: #1e293b;
-            border: 1px solid #d97706;
-            box-shadow: inset 0 -2px 0 rgba(0,0,0,0.1);
+            background-color: #FFD700; /* 고대비 노란색 */
+            color: #000;
+            border: 2px solid #000;
+            box-shadow: inset 0 -2px 0 rgba(0,0,0,0.2);
         }
         .seat-delete-btn {
             position: absolute;
             top: -5px;
             right: -5px;
-            width: 16px;
-            height: 16px;
+            width: 18px;
+            height: 18px;
             background: #ef4444;
             color: white;
             border-radius: 50%;
@@ -73,6 +81,7 @@
             opacity: 0;
             transition: opacity 0.2s;
             z-index: 30;
+            border: 1px solid white;
         }
         .seat:hover .seat-delete-btn {
             opacity: 1;
@@ -80,14 +89,14 @@
         .seat-highlight {
             background-color: #3b82f6 !important;
             color: white !important;
-            border-color: #1d4ed8 !important;
+            border-color: #000 !important;
             transform: scale(1.1);
             z-index: 20;
-            box-shadow: 0 0 15px rgba(59, 130, 246, 0.6);
+            box-shadow: 0 0 15px rgba(59, 130, 246, 0.8);
         }
         .seat-empty {
             background-color: #f1f5f9;
-            border: 1px solid #e2e8f0;
+            border: 1px solid #cbd5e1;
             color: transparent;
         }
         .aisle {
@@ -97,49 +106,62 @@
         @keyframes pop { from { transform: scale(0.9); opacity: 0; } to { transform: scale(1); opacity: 1; } }
         
         @media (max-width: 640px) {
-            .seat { height: 34px; font-size: 10px; }
-            .seat-delete-btn { width: 14px; height: 14px; font-size: 8px; }
+            .large-font .seat { height: 48px; font-size: 16px !important; }
         }
 
-        /* 인쇄 및 공유 시 시각화 최적화 */
         @media print {
             .no-print { display: none !important; }
             body { background: white; padding: 0; margin: 0; }
-            .max-w-6xl { max-width: 100% !important; padding: 0 !important; margin: 0 !important; }
-            .bus-container { 
-                box-shadow: none !important; 
-                border: 2px solid #ccc !important; 
-                page-break-inside: avoid;
-                margin-bottom: 20px;
-            }
-            .seat-delete-btn { display: none !important; }
-            section { page-break-before: auto; }
-            .grid { display: grid !important; }
+            .bus-container { box-shadow: none !important; border: 2px solid #000 !important; }
         }
 
-        /* 공유 중 로딩 오버레이 */
         .loading-overlay {
             position: fixed;
             inset: 0;
-            background: rgba(0,0,0,0.7);
+            background: rgba(0,0,0,0.8);
             z-index: 500;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
             color: white;
-            backdrop-blur: 5px;
+            backdrop-filter: blur(8px);
         }
         .spinner {
-            width: 40px;
-            height: 40px;
-            border: 4px solid rgba(255,255,255,0.3);
-            border-top: 4px solid #3b82f6;
+            width: 50px;
+            height: 50px;
+            border: 5px solid rgba(255,255,255,0.2);
+            border-top: 5px solid #FFD700;
             border-radius: 50%;
             animation: spin 1s linear infinite;
-            margin-bottom: 1rem;
+            margin-bottom: 1.5rem;
         }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        /* 테이블 스타일 개선 */
+        .info-table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0 8px;
+        }
+        .info-table th {
+            text-align: left;
+            padding: 12px 16px;
+            background: #f1f5f9;
+            color: #475569;
+            font-size: 12px;
+            font-weight: 900;
+            text-transform: uppercase;
+        }
+        .info-table td {
+            padding: 16px;
+            background: #fff;
+            border-top: 1px solid #e2e8f0;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        .info-table tr td:first-child { border-left: 1px solid #e2e8f0; border-radius: 12px 0 0 12px; }
+        .info-table tr td:last-child { border-right: 1px solid #e2e8f0; border-radius: 0 12px 12px 0; }
+        .large-font .info-table td { padding: 24px 16px; font-size: 1.2rem; font-weight: 700; }
     </style>
 </head>
 <body class="text-slate-900">
@@ -154,11 +176,8 @@
             '2/25(수) 오전'
         ];
 
-        // 이미지에 명시된 행(row)과 열(column)을 기반으로 데이터 생성
         const generateInitialData = () => {
             const data = [];
-
-            // 보조 함수: 특정 위치에 좌석 배치
             const addSeat = (vehicle, row, col, name) => {
                 if (!name) return;
                 const seatPosition = row * 4 + col;
@@ -173,7 +192,6 @@
                 });
             };
 
-            // 선발대 (이미지 1열-4열 기준)
             const b1_raw = [
                 ["박미순", "박순", "신효성", "박영미"],
                 ["박승희", "윤미애", "공현애", "노민숙"],
@@ -187,7 +205,6 @@
             ];
             b1_raw.forEach((row, rIdx) => row.forEach((name, cIdx) => addSeat('선발대', rIdx, cIdx, name)));
 
-            // 2호차 (이미지 중간 구역 기준)
             const b2_raw = [
                 ["윤해권", "배현기", "양회순", "이양호"],
                 ["송기호", "서영진", "이춘선", "김성옥"],
@@ -204,7 +221,6 @@
             ];
             b2_raw.forEach((row, rIdx) => row.forEach((name, cIdx) => addSeat('2호차', rIdx, cIdx, name)));
 
-            // 3호차 (이미지 우측 구역 기준)
             const b3_raw = [
                 ["정해웅", "송희상", "김경만", "나병상"],
                 ["정찬삼", "이상교", "속국한", "송정한"],
@@ -217,7 +233,6 @@
             ];
             b3_raw.forEach((row, rIdx) => row.forEach((name, cIdx) => addSeat('3호차', rIdx, cIdx, name)));
 
-            // 기타 차량 정보 (기존 데이터 유지)
             const privateGroups = [
                 { gid: 'p1', dr: '나수금', ps: ["이영욱", "이경애", "이혜령", "박유미"], dep: '2/23(월) 저녁', ret: '2/24(화) 저녁', note: '나수금S 차량 | 귀가시 이혜령, 박유미 동승' },
                 { gid: 'p2', dr: '고홍석', ps: ["이철귀"], dep: '2/23(월) 오후', ret: '2/24(화) 저녁', note: '고홍석B 차량' },
@@ -247,42 +262,28 @@
             return data;
         };
 
-        const DeleteConfirm = ({ name, onConfirm, onCancel }) => (
-            <div className="fixed inset-0 z-[300] flex items-center justify-center p-6 bg-slate-900/60 backdrop-blur-sm no-print" onClick={onCancel}>
-                <div className="bg-white w-full max-w-xs rounded-3xl overflow-hidden shadow-2xl animate-pop" onClick={e => e.stopPropagation()}>
-                    <div className="p-8 text-center">
-                        <div className="w-16 h-16 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto mb-4 text-2xl">⚠️</div>
-                        <h3 className="text-xl font-black mb-2">정말 삭제할까요?</h3>
-                        <p className="text-slate-500 text-sm font-medium leading-relaxed">[{name}] 님을 명단에서 제외합니다.</p>
-                    </div>
-                    <div className="flex border-t border-slate-100">
-                        <button onClick={onCancel} className="flex-1 py-4 font-bold text-slate-400">취소</button>
-                        <button onClick={onConfirm} className="flex-1 py-4 font-black text-red-600 border-l border-slate-100">삭제</button>
-                    </div>
-                </div>
-            </div>
-        );
-
         const App = () => {
             const [data, setData] = useState([]);
             const [isAdmin, setIsAdmin] = useState(true);
+            const [isLargeFont, setIsLargeFont] = useState(false);
             const [searchTerm, setSearchTerm] = useState('');
             const [selectedItem, setSelectedItem] = useState(null);
             const [confirmId, setConfirmId] = useState(null);
-            const [draggedId, setDraggedId] = useState(null);
             const [isSharing, setIsSharing] = useState(false);
             
-            const captureRef = useRef(null);
+            const busRef = useRef(null);
+            const privateRef = useRef(null);
+            const churchRef = useRef(null);
 
             const [form, setForm] = useState({ name: '', vehicle: '선발대', dep: '2/23(월) 오전', ret: '2/25(수) 오전', memo: '' });
 
             useEffect(() => {
-                const saved = localStorage.getItem('retreat_2026_full_v8');
+                const saved = localStorage.getItem('retreat_2026_full_v9');
                 setData(saved ? JSON.parse(saved) : generateInitialData());
             }, []);
 
             useEffect(() => {
-                if (data.length > 0) localStorage.setItem('retreat_2026_full_v8', JSON.stringify(data));
+                if (data.length > 0) localStorage.setItem('retreat_2026_full_v9', JSON.stringify(data));
             }, [data]);
 
             const stats = useMemo(() => ({
@@ -320,58 +321,34 @@
                 setForm({ ...form, name: '', memo: '' });
             };
 
-            const handleDrop = (e, vehicle, seat) => {
-                e.preventDefault();
-                const sid = e.dataTransfer.getData('sid');
-                if (!sid) return;
-                setData(prev => {
-                    const next = [...prev];
-                    const sIdx = next.findIndex(p => p.id === sid);
-                    const tIdx = next.findIndex(p => p.vehicleType === vehicle && p.seatPosition === seat);
-                    const sItem = next[sIdx];
-                    if (tIdx !== -1) {
-                        const tItem = next[tIdx];
-                        next[sIdx] = { ...sItem, vehicleType: vehicle, seatPosition: seat };
-                        next[tIdx] = { ...tItem, vehicleType: sItem.vehicleType, seatPosition: sItem.seatPosition };
-                    } else {
-                        next[sIdx] = { ...sItem, vehicleType: vehicle, seatPosition: seat };
-                    }
-                    return next;
-                });
-                setDraggedId(null);
-            };
-
-            const handleShare = async () => {
-                if (!captureRef.current) return;
+            const handleSharePart = async (ref, filename) => {
+                if (!ref.current) return;
                 setIsSharing(true);
-                
                 try {
-                    const canvas = await html2canvas(captureRef.current, {
+                    const canvas = await html2canvas(ref.current, {
                         useCORS: true,
                         scale: 2,
                         backgroundColor: '#f8fafc',
                         ignoreElements: (element) => element.classList.contains('no-print')
                     });
-                    
                     const dataUrl = canvas.toDataURL('image/png');
                     const blob = await (await fetch(dataUrl)).blob();
-                    const file = new File([blob], '2026_수련회_차량배정.png', { type: 'image/png' });
+                    const file = new File([blob], `${filename}.png`, { type: 'image/png' });
 
                     if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
                         await navigator.share({
                             files: [file],
                             title: '2026 전도인 수련회 차량배정',
-                            text: '차량 배정 현황 공유드립니다.',
+                            text: `${filename} 현황 공유드립니다.`,
                         });
                     } else {
                         const link = document.createElement('a');
                         link.href = dataUrl;
-                        link.download = '2026_수련회_차량배정.png';
+                        link.download = `${filename}.png`;
                         link.click();
                     }
                 } catch (err) {
                     console.error('공유 실패:', err);
-                    alert('이미지 생성 또는 공유 중 오류가 발생했습니다.');
                 } finally {
                     setIsSharing(false);
                 }
@@ -379,14 +356,14 @@
 
             const renderBus = (type) => {
                 const members = data.filter(p => p.vehicleType === type);
-                const capacity = type === '2호차' ? 48 : 48; // 행 12개 x 4열
-
                 return (
                     <div className="bus-container animate-pop">
-                        <div className="bus-head">
-                            <div className="w-10 h-10 bg-slate-200 rounded-full flex items-center justify-center text-xs font-black">운전</div>
-                            <div className="w-10 h-10 border-2 border-slate-200 rounded-lg flex items-center justify-center text-[10px] font-bold text-slate-300">입구</div>
-                        </div>
+                        {!isLargeFont && (
+                            <div className="bus-head">
+                                <div className="w-10 h-10 bg-slate-200 rounded-full flex items-center justify-center text-[10px] font-black">운전</div>
+                                <div className="w-10 h-10 border-2 border-slate-200 rounded-lg flex items-center justify-center text-[10px] font-bold text-slate-300">입구</div>
+                            </div>
+                        )}
                         <h4 className="text-center font-black text-xl mb-6 text-slate-800">{type}</h4>
                         <div className="flex justify-center gap-1">
                             <div className="grid grid-cols-2 gap-1 flex-1">
@@ -396,15 +373,11 @@
                                     const isMatch = searchTerm.trim() !== '' && p?.name.includes(searchTerm.trim());
                                     return (
                                         <div key={seatIdx} 
-                                            onDragOver={e => e.preventDefault()} 
-                                            onDrop={e => handleDrop(e, type, seatIdx)}
-                                            className={`seat ${p ? 'seat-occupied' : 'seat-empty'} ${draggedId === p?.id ? 'opacity-20' : ''} ${isMatch ? 'seat-highlight' : ''}`}
-                                            draggable={isAdmin && !!p}
-                                            onDragStart={e => { setDraggedId(p.id); e.dataTransfer.setData('sid', p.id); }}
+                                            className={`seat ${p ? 'seat-occupied' : 'seat-empty'} ${isMatch ? 'seat-highlight' : ''}`}
                                             onClick={() => p && setSelectedItem(p)}
                                         >
                                             {p?.name}
-                                            {isAdmin && p && (
+                                            {isAdmin && p && !isLargeFont && (
                                                 <button onClick={(e) => { e.stopPropagation(); setConfirmId(p.id); }} className="seat-delete-btn no-print">✕</button>
                                             )}
                                         </div>
@@ -419,15 +392,11 @@
                                     const isMatch = searchTerm.trim() !== '' && p?.name.includes(searchTerm.trim());
                                     return (
                                         <div key={seatIdx} 
-                                            onDragOver={e => e.preventDefault()} 
-                                            onDrop={e => handleDrop(e, type, seatIdx)}
-                                            className={`seat ${p ? 'seat-occupied' : 'seat-empty'} ${draggedId === p?.id ? 'opacity-20' : ''} ${isMatch ? 'seat-highlight' : ''}`}
-                                            draggable={isAdmin && !!p}
-                                            onDragStart={e => { setDraggedId(p.id); e.dataTransfer.setData('sid', p.id); }}
+                                            className={`seat ${p ? 'seat-occupied' : 'seat-empty'} ${isMatch ? 'seat-highlight' : ''}`}
                                             onClick={() => p && setSelectedItem(p)}
                                         >
                                             {p?.name}
-                                            {isAdmin && p && (
+                                            {isAdmin && p && !isLargeFont && (
                                                 <button onClick={(e) => { e.stopPropagation(); setConfirmId(p.id); }} className="seat-delete-btn no-print">✕</button>
                                             )}
                                         </div>
@@ -439,13 +408,44 @@
                 );
             };
 
-            const otherPassengers = useMemo(() => {
-                if (!selectedItem || !selectedItem.groupId) return [];
-                return data.filter(p => p.groupId === selectedItem.groupId && p.id !== selectedItem.id);
-            }, [selectedItem, data]);
+            const renderTable = (cat) => {
+                const list = data.filter(p => p.vehicleType === cat && (searchTerm.trim() === '' || p.name.includes(searchTerm.trim())));
+                if (list.length === 0 && searchTerm.trim() === '') return null;
+                return (
+                    <table className="info-table">
+                        <thead>
+                            <tr>
+                                <th>성함</th>
+                                <th>출발일시</th>
+                                <th>메모/차량정보</th>
+                                {!isLargeFont && <th className="no-print">관리</th>}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {list.map(p => (
+                                <tr key={p.id} onClick={() => setSelectedItem(p)} className="cursor-pointer hover:bg-slate-50">
+                                    <td className="font-black text-slate-900">
+                                        <div className="flex items-center gap-2">
+                                            {p.name}
+                                            {p.isDriver && <span className="bg-red-500 text-white text-[9px] px-1.5 py-0.5 rounded font-black">운전</span>}
+                                        </div>
+                                    </td>
+                                    <td className="text-blue-600 font-bold">{p.departure}</td>
+                                    <td className="text-slate-500 font-medium">{p.details}</td>
+                                    {!isLargeFont && (
+                                        <td className="no-print">
+                                            {isAdmin && <button onClick={e => { e.stopPropagation(); setConfirmId(p.id); }} className="text-red-500 font-black">✕</button>}
+                                        </td>
+                                    )}
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                );
+            };
 
             return (
-                <div className="max-w-6xl mx-auto px-4 py-8 pb-32">
+                <div className={`max-w-6xl mx-auto px-4 py-8 pb-32 ${isLargeFont ? 'large-font' : ''}`}>
                     {isSharing && (
                         <div className="loading-overlay">
                             <div className="spinner"></div>
@@ -454,129 +454,106 @@
                     )}
 
                     <header className="flex flex-col sm:flex-row justify-between items-center mb-10 no-print gap-4">
-                        <div>
-                            <h1 className="text-3xl font-black text-slate-900 tracking-tighter text-center sm:text-left">2026 전도인 수련회 <span className="text-blue-600">차량운영</span></h1>
-                            <p className="text-xs font-bold text-slate-400 uppercase tracking-widest text-center sm:text-left">Evangelist Retreat Dashboard</p>
+                        <div className="text-center sm:text-left">
+                            <h1 className="text-3xl font-black text-slate-900 tracking-tighter">2026 전도인 수련회 <span className="text-blue-600">차량운영</span></h1>
+                            <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Evangelist Retreat Dashboard</p>
                         </div>
-                        <div className="flex gap-2">
-                            <button onClick={() => setIsAdmin(!isAdmin)} className={`px-4 py-2 rounded-xl font-black text-[10px] shadow-sm transition-all ${isAdmin ? 'bg-slate-200 text-slate-600' : 'bg-slate-800 text-white'}`}>
-                                {isAdmin ? 'ADMIN MODE' : 'VIEW MODE'}
+                        <div className="flex gap-2 flex-wrap justify-center">
+                            <button onClick={() => setIsLargeFont(!isLargeFont)} className={`px-5 py-3 rounded-2xl font-black text-sm shadow-xl transition-all ${isLargeFont ? 'bg-amber-500 text-white' : 'bg-white border-2 border-slate-200 text-slate-600'}`}>
+                                {isLargeFont ? '일반 보기' : '🔎 크게 보기'}
                             </button>
-                            <button onClick={handleShare} className="px-6 py-3 rounded-2xl font-black text-xs shadow-xl bg-blue-600 text-white active:scale-95 transition-all">
-                                📤 공유
+                            <button onClick={() => setIsAdmin(!isAdmin)} className={`px-4 py-3 rounded-xl font-black text-[10px] shadow-sm transition-all ${isAdmin ? 'bg-slate-200 text-slate-600' : 'bg-slate-800 text-white'}`}>
+                                {isAdmin ? 'ADMIN' : 'VIEW'}
                             </button>
                         </div>
                     </header>
 
-                    <div ref={captureRef} id="capture-area" className="bg-transparent p-2">
-                        <div className="hidden print:block mb-8 text-center border-b-4 border-slate-900 pb-4">
-                            <h1 className="text-4xl font-black mb-1">2026 전도인 수련회 차량 배정 현황</h1>
-                            <p className="text-slate-500 font-bold">작성 일시: {new Date().toLocaleDateString()} {new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</p>
-                        </div>
-
-                        {isAdmin && (
-                            <section className="bg-white p-8 rounded-[40px] shadow-2xl border border-slate-100 mb-12 animate-pop no-print">
-                                <h3 className="text-sm font-black text-slate-400 uppercase mb-6 flex items-center gap-2">
-                                    <span className="w-2 h-2 bg-blue-500 rounded-full"></span> 신규 배정 등록
-                                </h3>
-                                <form onSubmit={handleAdd} className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                    <div className="space-y-4">
-                                        <input type="text" placeholder="성함" value={form.name} onChange={e => setForm({...form, name: e.target.value})} className="w-full h-14 px-6 bg-slate-50 border-2 border-slate-100 rounded-2xl font-bold outline-none focus:border-blue-500 transition-colors" />
-                                        <select value={form.vehicle} onChange={e => setForm({...form, vehicle: e.target.value})} className="w-full h-14 px-6 bg-slate-50 border-2 border-slate-100 rounded-2xl font-bold outline-none">
-                                            {['선발대', '2호차', '3호차', '개인차량', '교회차량'].map(v => <option key={v}>{v}</option>)}
+                    {!isLargeFont && isAdmin && (
+                        <section className="bg-white p-8 rounded-[40px] shadow-2xl border border-slate-100 mb-12 animate-pop no-print">
+                            <h3 className="text-sm font-black text-slate-400 uppercase mb-6 flex items-center gap-2">
+                                <span className="w-2 h-2 bg-blue-500 rounded-full"></span> 신규 배정 등록
+                            </h3>
+                            <form onSubmit={handleAdd} className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div className="space-y-4">
+                                    <input type="text" placeholder="성함" value={form.name} onChange={e => setForm({...form, name: e.target.value})} className="w-full h-14 px-6 bg-slate-50 border-2 border-slate-100 rounded-2xl font-bold outline-none" />
+                                    <select value={form.vehicle} onChange={e => setForm({...form, vehicle: e.target.value})} className="w-full h-14 px-6 bg-slate-50 border-2 border-slate-100 rounded-2xl font-bold outline-none">
+                                        {['선발대', '2호차', '3호차', '개인차량', '교회차량'].map(v => <option key={v}>{v}</option>)}
+                                    </select>
+                                </div>
+                                <div className="space-y-4">
+                                    <div className="flex gap-2">
+                                        <select value={form.dep} onChange={e => setForm({...form, dep: e.target.value})} className="flex-1 h-14 px-4 bg-slate-50 border-2 border-slate-100 rounded-2xl font-bold text-sm">
+                                            {TIME_OPTIONS.map(t => <option key={t}>{t}</option>)}
+                                        </select>
+                                        <select value={form.ret} onChange={e => setForm({...form, ret: e.target.value})} className="flex-1 h-14 px-4 bg-slate-50 border-2 border-slate-100 rounded-2xl font-bold text-sm">
+                                            {TIME_OPTIONS.map(t => <option key={t}>{t}</option>)}
                                         </select>
                                     </div>
-                                    <div className="space-y-4">
-                                        <div className="flex gap-2">
-                                            <select value={form.dep} onChange={e => setForm({...form, dep: e.target.value})} className="flex-1 h-14 px-4 bg-slate-50 border-2 border-slate-100 rounded-2xl font-bold text-sm">
-                                                {TIME_OPTIONS.map(t => <option key={t}>{t}</option>)}
-                                            </select>
-                                            <select value={form.ret} onChange={e => setForm({...form, ret: e.target.value})} className="flex-1 h-14 px-4 bg-slate-50 border-2 border-slate-100 rounded-2xl font-bold text-sm">
-                                                {TIME_OPTIONS.map(t => <option key={t}>{t}</option>)}
-                                            </select>
-                                        </div>
-                                        <input type="text" placeholder="메모" value={form.memo} onChange={e => setForm({...form, memo: e.target.value})} className="w-full h-14 px-6 bg-slate-50 border-2 border-slate-100 rounded-2xl font-bold outline-none" />
-                                    </div>
-                                    <button className="md:col-span-2 h-16 bg-blue-600 text-white rounded-2xl font-black text-lg shadow-xl active:scale-[0.98] transition-all">배정 완료</button>
-                                </form>
-                            </section>
-                        )}
-
-                        <div className="relative mb-12 group no-print">
-                            <input type="text" placeholder="이름을 입력하여 위치를 확인하세요..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="w-full h-20 bg-white border-4 border-slate-100 rounded-full px-16 font-black text-xl shadow-2xl outline-none focus:border-blue-500 transition-all" />
-                            <div className="absolute left-6 top-1/2 -translate-y-1/2 text-2xl opacity-20">🔍</div>
-                        </div>
-
-                        {searchTerm.trim() !== '' && (
-                            <div className="mb-12 bg-blue-50 border-2 border-blue-100 p-6 rounded-[32px] animate-pop no-print">
-                                <h4 className="text-sm font-black text-blue-400 uppercase mb-4">'{searchTerm}' 검색 결과 ({searchResults.length}건)</h4>
-                                <div className="flex flex-wrap gap-2">
-                                    {searchResults.map(p => (
-                                        <button key={p.id} onClick={() => setSelectedItem(p)} className="bg-white border-2 border-blue-200 px-4 py-2 rounded-full text-sm font-black text-blue-600 hover:bg-blue-600 hover:text-white transition-all shadow-sm">
-                                            {p.name} ({p.vehicleType})
-                                        </button>
-                                    ))}
-                                    {searchResults.length === 0 && <p className="text-slate-400 font-bold text-sm">검색 결과가 없습니다.</p>}
+                                    <input type="text" placeholder="메모" value={form.memo} onChange={e => setForm({...form, memo: e.target.value})} className="w-full h-14 px-6 bg-slate-50 border-2 border-slate-100 rounded-2xl font-bold outline-none" />
                                 </div>
-                            </div>
-                        )}
-
-                        <div className="flex justify-around mb-16 text-center">
-                            <div><p className="text-[10px] font-black text-slate-300">버스 합계</p><p className="text-2xl font-black">{stats.b1+stats.b2+stats.b3}</p></div>
-                            <div><p className="text-[10px] font-black text-slate-300">개인차량</p><p className="text-2xl font-black text-emerald-500">{stats.priv}</p></div>
-                            <div><p className="text-[10px] font-black text-slate-300">교회차량</p><p className="text-2xl font-black text-amber-500">{stats.church}</p></div>
-                        </div>
-
-                        <section className="mb-20">
-                            <h2 className="text-2xl font-black text-slate-800 mb-10 border-l-8 border-blue-500 pl-4">🚌 버스 탑승 좌석도</h2>
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10">
-                                {renderBus('선발대')}{renderBus('2호차')}{renderBus('3호차')}
-                            </div>
+                                <button className="md:col-span-2 h-16 bg-blue-600 text-white rounded-2xl font-black text-lg shadow-xl">배정 완료</button>
+                            </form>
                         </section>
+                    )}
 
-                        <section>
-                            <h2 className="text-2xl font-black text-slate-800 mb-10 border-l-8 border-slate-200 pl-4">🚗 기타 차량 배정 현황</h2>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                                {['개인차량', '교회차량'].map(cat => {
-                                    const list = data.filter(p => p.vehicleType === cat && (searchTerm.trim() === '' || p.name.includes(searchTerm.trim())));
-                                    if (list.length === 0 && searchTerm.trim() === '') return null;
-                                    return (
-                                        <div key={cat} className="mb-8">
-                                            <h3 className={`text-lg font-black mb-6 px-4 py-2 inline-block rounded-xl ${cat === '개인차량' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>{cat}</h3>
-                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                                {list.map(p => (
-                                                    <div key={p.id} className="bg-white p-6 rounded-[32px] border-2 border-slate-50 shadow-sm hover:shadow-xl transition-all cursor-pointer group" onClick={() => setSelectedItem(p)}>
-                                                        <div className="flex justify-between items-start">
-                                                            <div>
-                                                                <div className="flex items-center gap-2 mb-2">
-                                                                    <span className="text-xl font-black text-slate-800">{p.name}</span>
-                                                                    {p.isDriver && <span className="bg-red-500 text-white text-[8px] px-1.5 py-0.5 rounded-md font-black">DRIVER</span>}
-                                                                </div>
-                                                                <div className="flex flex-col gap-1">
-                                                                    <span className="text-[11px] font-black text-blue-600 bg-blue-50 px-2 py-0.5 rounded-lg w-fit">출발: {p.departure}</span>
-                                                                    <p className="text-[10px] font-bold text-slate-400 line-clamp-1">{p.details}</p>
-                                                                </div>
-                                                            </div>
-                                                            {isAdmin && <button onClick={e => { e.stopPropagation(); setConfirmId(p.id); }} className="text-slate-200 hover:text-red-500 text-xl transition-colors no-print">✕</button>}
-                                                        </div>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        </section>
+                    <div className="relative mb-12 group no-print">
+                        <input type="text" placeholder="이름을 입력하여 위치를 확인하세요..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="w-full h-20 bg-white border-4 border-slate-100 rounded-full px-16 font-black text-xl shadow-2xl outline-none focus:border-blue-500 transition-all" />
+                        <div className="absolute left-6 top-1/2 -translate-y-1/2 text-2xl opacity-20">🔍</div>
                     </div>
 
-                    {confirmId && <DeleteConfirm name={data.find(p => p.id === confirmId)?.name} onConfirm={() => { setData(d => d.filter(p => p.id !== confirmId)); setConfirmId(null); }} onCancel={() => setConfirmId(null)} />}
+                    <div className="flex justify-around mb-16 text-center">
+                        <div><p className="text-[10px] font-black text-slate-300">버스 합계</p><p className="text-2xl font-black">{stats.b1+stats.b2+stats.b3}</p></div>
+                        <div><p className="text-[10px] font-black text-slate-300">개인차량</p><p className="text-2xl font-black text-emerald-500">{stats.priv}</p></div>
+                        <div><p className="text-[10px] font-black text-slate-300">교회차량</p><p className="text-2xl font-black text-amber-500">{stats.church}</p></div>
+                    </div>
+
+                    <section className="mb-20">
+                        <div className="flex justify-between items-center mb-10 no-print">
+                            <h2 className="text-2xl font-black text-slate-800 border-l-8 border-blue-500 pl-4">🚌 버스 탑승 좌석도</h2>
+                            <button onClick={() => handleSharePart(busRef, '버스_명단')} className="bg-slate-900 text-white px-4 py-2 rounded-xl text-[10px] font-black shadow-lg">버스 명단 저장</button>
+                        </div>
+                        <div ref={busRef} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10 p-2">
+                            {renderBus('선발대')}{renderBus('2호차')}{renderBus('3호차')}
+                        </div>
+                    </section>
+
+                    <section className="mb-20">
+                        <div className="flex justify-between items-center mb-10 no-print">
+                            <h2 className="text-2xl font-black text-slate-800 border-l-8 border-emerald-500 pl-4">🚗 개인차량 현황</h2>
+                            <button onClick={() => handleSharePart(privateRef, '개인차량_명단')} className="bg-emerald-600 text-white px-4 py-2 rounded-xl text-[10px] font-black shadow-lg">개인차량 저장</button>
+                        </div>
+                        <div ref={privateRef} className="overflow-x-auto p-2">
+                            {renderTable('개인차량')}
+                        </div>
+                    </section>
+
+                    <section className="mb-20">
+                        <div className="flex justify-between items-center mb-10 no-print">
+                            <h2 className="text-2xl font-black text-slate-800 border-l-8 border-amber-500 pl-4">🚐 교회차량 현황</h2>
+                            <button onClick={() => handleSharePart(churchRef, '교회차량_명단')} className="bg-amber-600 text-white px-4 py-2 rounded-xl text-[10px] font-black shadow-lg">교회차량 저장</button>
+                        </div>
+                        <div ref={churchRef} className="overflow-x-auto p-2">
+                            {renderTable('교회차량')}
+                        </div>
+                    </section>
+
+                    {confirmId && (
+                        <div className="fixed inset-0 z-[300] flex items-center justify-center p-6 bg-slate-900/60 no-print">
+                            <div className="bg-white w-full max-w-xs rounded-3xl overflow-hidden shadow-2xl p-8 text-center">
+                                <h3 className="text-xl font-black mb-4">정말 삭제할까요?</h3>
+                                <div className="flex gap-2">
+                                    <button onClick={() => setConfirmId(null)} className="flex-1 py-4 font-bold text-slate-400 bg-slate-100 rounded-xl">취소</button>
+                                    <button onClick={() => { setData(d => d.filter(p => p.id !== confirmId)); setConfirmId(null); }} className="flex-1 py-4 font-black text-white bg-red-600 rounded-xl">삭제</button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
                     
                     {selectedItem && (
                         <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md no-print" onClick={() => setSelectedItem(null)}>
                             <div className="bg-white w-full max-w-lg rounded-[40px] overflow-hidden shadow-2xl animate-pop" onClick={e => e.stopPropagation()}>
                                 <div className={`p-10 ${selectedItem.vehicleType === '개인차량' ? 'bg-emerald-500' : selectedItem.vehicleType === '교회차량' ? 'bg-amber-500' : 'bg-blue-600'} text-white relative`}>
                                     <button onClick={() => setSelectedItem(null)} className="absolute top-6 right-6 w-10 h-10 flex items-center justify-center bg-black/10 rounded-full text-xl font-black">✕</button>
-                                    <h4 className="text-[10px] font-black uppercase tracking-widest opacity-60 mb-2">{selectedItem.vehicleType}</h4>
                                     <h2 className="text-5xl font-black">{selectedItem.name}</h2>
                                 </div>
                                 <div className="p-10 space-y-8 max-h-[60vh] overflow-y-auto">
@@ -584,24 +561,11 @@
                                         <div><p className="text-[10px] font-black text-slate-300 uppercase mb-2">Departure</p><p className="text-lg font-black text-slate-800">{selectedItem.departure}</p></div>
                                         <div><p className="text-[10px] font-black text-slate-300 uppercase mb-2">Return</p><p className="text-lg font-black text-slate-800">{selectedItem.return}</p></div>
                                     </div>
-                                    
                                     <div>
                                         <p className="text-[10px] font-black text-slate-300 uppercase mb-2">Vehicle Info</p>
-                                        <p className="text-xl font-bold text-slate-600 leading-relaxed">{selectedItem.details || '추가 메모가 없습니다.'}</p>
+                                        <p className="text-xl font-bold text-slate-600">{selectedItem.details || '추가 메모가 없습니다.'}</p>
                                     </div>
-
-                                    {otherPassengers.length > 0 && (
-                                        <div className="pt-6 border-t border-slate-100">
-                                            <p className="text-[10px] font-black text-slate-300 uppercase mb-4">동승자 ({otherPassengers.length}명)</p>
-                                            <div className="flex flex-wrap gap-2">
-                                                {otherPassengers.map(op => (
-                                                    <span key={op.id} className="bg-slate-50 border border-slate-100 px-4 py-2 rounded-full text-sm font-black text-slate-700">{op.name}</span>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    <button onClick={() => setSelectedItem(null)} className="w-full py-5 bg-slate-900 text-white rounded-2xl font-black active:scale-95 transition-all">확인</button>
+                                    <button onClick={() => setSelectedItem(null)} className="w-full py-5 bg-slate-900 text-white rounded-2xl font-black">확인</button>
                                 </div>
                             </div>
                         </div>
